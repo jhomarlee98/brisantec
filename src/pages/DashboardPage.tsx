@@ -55,7 +55,7 @@ export default function DashboardPage() {
           <nav className="space-y-1">
             <NavItem icon={Home} label="Inicio" active />
             <NavItem icon={FileText} label="Comprobantes" />
-            <NavItem icon={Users} label="Clientes" />
+            <NavItem icon={Users} label="Clientes" onClick={() => navigate("/clientes")} />
             <NavItem icon={HandCoins} label="Pagos" />
             <NavItem icon={Settings} label="Configuración" />
           </nav>
@@ -122,7 +122,7 @@ export default function DashboardPage() {
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
         <div className="mx-auto grid max-w-md grid-cols-4">
           <MobileNavItem icon={Home} label="Inicio" active />
-          <MobileNavItem icon={Users} label="Clientes" />
+          <MobileNavItem icon={Users} label="Clientes" onClick={() => navigate("/clientes")} />
           <MobileNavItem icon={Plus} label="Nueva" emphasized onClick={() => navigate('/comprobantes/nuevo')} />
           <MobileNavItem icon={FileText} label="Facturas" />
         </div>
