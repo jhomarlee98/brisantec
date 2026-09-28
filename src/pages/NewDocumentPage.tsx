@@ -300,7 +300,6 @@ export default function NewDocumentPage() {
                   emptyText="Aún no has agregado productos."
                   onAdd={() => startNewItem('PRODUCTO')}
                   onEdit={startEditItem}
-                  onEdit={startEditItem}
                   onRemove={removeItem}
                 />
                 <ItemGroup
@@ -310,6 +309,7 @@ export default function NewDocumentPage() {
                   currencySymbol={currencySymbol}
                   emptyText="Aún no has agregado servicios."
                   onAdd={() => startNewItem('SERVICIO')}
+                  onEdit={startEditItem}
                   onRemove={removeItem}
                 />
               </div>
