@@ -135,13 +135,16 @@ function NavItem({
   icon: Icon,
   label,
   active = false,
+  onClick,
 }: {
   icon: LucideIcon
   label: string
   active?: boolean
+  onClick?: () => void | Promise<void>
 }) {
   return (
     <button
+      onClick={onClick}
       className={`flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
         active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
       }`}
