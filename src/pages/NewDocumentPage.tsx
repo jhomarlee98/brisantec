@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   Package,
+  Pencil,
   Plus,
   Receipt,
   Save,
@@ -54,6 +55,7 @@ export default function NewDocumentPage() {
   const [items, setItems] = useState<Item[]>(initialItems)
   const [itemTypeDialogOpen, setItemTypeDialogOpen] = useState(false)
   const [itemFormOpen, setItemFormOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [itemDraft, setItemDraft] = useState({
     type: 'PRODUCTO' as ItemType,
     code: '',
@@ -88,7 +90,23 @@ export default function NewDocumentPage() {
       igvRate: '18',
       saveToCatalog: true,
     })
+    setEditingItemId(null)
     setItemTypeDialogOpen(false)
+    setItemFormOpen(true)
+  }
+
+  function startEditItem(item: Item) {
+    setEditingItemId(item.id)
+    setItemDraft({
+      type: item.type,
+      code: item.code ?? '',
+      description: item.description,
+      unit: item.unit,
+      quantity: String(item.quantity),
+      unitValue: String(item.unitValue),
+      igvRate: String(Math.round(item.igvRate * 100)),
+      saveToCatalog: item.saveToCatalog ?? false,
+    })
     setItemFormOpen(true)
   }
 
@@ -102,20 +120,42 @@ export default function NewDocumentPage() {
       return
     }
 
-    setItems((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        type: itemDraft.type,
-        code: itemDraft.code.trim() || undefined,
-        description,
-        unit: itemDraft.unit,
-        quantity,
-        unitValue,
-        igvRate,
-        saveToCatalog: itemDraft.saveToCatalog,
-      },
-    ])
+    if (editingItemId !== null) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === editingItemId
+            ? {
+                ...item,
+                type: itemDraft.type,
+                code: itemDraft.code.trim() || undefined,
+                description,
+                unit: itemDraft.unit,
+                quantity,
+                unitValue,
+                igvRate,
+                saveToCatalog: itemDraft.saveToCatalog,
+              }
+            : item,
+        ),
+      )
+    } else {
+      setItems((current) => [
+        ...current,
+        {
+          id: Date.now(),
+          type: itemDraft.type,
+          code: itemDraft.code.trim() || undefined,
+          description,
+          unit: itemDraft.unit,
+          quantity,
+          unitValue,
+          igvRate,
+          saveToCatalog: itemDraft.saveToCatalog,
+        },
+      ])
+    }
+
+    setEditingItemId(null)
     setItemFormOpen(false)
   }
 
@@ -259,6 +299,8 @@ export default function NewDocumentPage() {
                   currencySymbol={currencySymbol}
                   emptyText="Aún no has agregado productos."
                   onAdd={() => startNewItem('PRODUCTO')}
+                  onEdit={startEditItem}
+                  onEdit={startEditItem}
                   onRemove={removeItem}
                 />
                 <ItemGroup
@@ -429,10 +471,10 @@ export default function NewDocumentPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">
-                    Nuevo {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}
+                    {editingItemId !== null ? 'Editar' : 'Nuevo'} {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    Completa los datos que se mostrarán en el comprobante.
+                    Completa los datos que se mostrarán en el comprobante. La emisión no depende de existencias o stock.
                   </p>
                 </div>
               </div>
@@ -571,7 +613,7 @@ export default function NewDocumentPage() {
                 disabled={!itemDraft.description.trim() || Number(itemDraft.quantity) <= 0 || Number(itemDraft.unitValue) < 0 || itemDraft.unitValue === ''}
                 className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Agregar {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}
+                {editingItemId !== null ? 'Guardar cambios' : `Agregar ${itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}`}
               </button>
             </div>
           </div>
@@ -588,6 +630,7 @@ function ItemGroup({
   currencySymbol,
   emptyText,
   onAdd,
+  onEdit,
   onRemove,
 }: {
   title: string
@@ -596,6 +639,7 @@ function ItemGroup({
   currencySymbol: string
   emptyText: string
   onAdd: () => void
+  onEdit: (item: Item) => void
   onRemove: (id: number) => void
 }) {
   return (
@@ -636,13 +680,22 @@ function ItemGroup({
                       {item.code ? `${item.code} · ` : ''}{item.unit}
                     </p>
                   </div>
-                  <button
-                    onClick={() => onRemove(item.id)}
-                    className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                    aria-label={`Eliminar ${item.type.toLowerCase()}`}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => onEdit(item)}
+                      className="grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
+                      aria-label={`Editar ${item.type.toLowerCase()}`}
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => onRemove(item.id)}
+                      className="grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                      aria-label={`Eliminar ${item.type.toLowerCase()}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
