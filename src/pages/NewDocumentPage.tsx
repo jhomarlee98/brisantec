@@ -3,6 +3,7 @@ import {
   Building2,
   CalendarDays,
   CircleDollarSign,
+  ClipboardList,
   FileText,
   Package,
   Plus,
@@ -24,10 +25,13 @@ type ItemType = 'PRODUCTO' | 'SERVICIO'
 type Item = {
   id: number
   type: ItemType
+  code?: string
   description: string
+  unit: string
   quantity: number
   unitValue: number
   igvRate: number
+  saveToCatalog?: boolean
 }
 
 const initialItems: Item[] = [
@@ -35,6 +39,7 @@ const initialItems: Item[] = [
     id: 1,
     type: 'PRODUCTO',
     description: 'ESPÁRRAGO DE ARO Y CAMBIO CAC-888',
+    unit: 'UNIDAD',
     quantity: 2,
     unitValue: 13.42,
     igvRate: 0.18,
@@ -48,6 +53,17 @@ export default function NewDocumentPage() {
   const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>('CONTADO')
   const [items, setItems] = useState<Item[]>(initialItems)
   const [itemTypeDialogOpen, setItemTypeDialogOpen] = useState(false)
+  const [itemFormOpen, setItemFormOpen] = useState(false)
+  const [itemDraft, setItemDraft] = useState({
+    type: 'PRODUCTO' as ItemType,
+    code: '',
+    description: '',
+    unit: 'UNIDAD',
+    quantity: '1',
+    unitValue: '',
+    igvRate: '18',
+    saveToCatalog: true,
+  })
 
   const totals = useMemo(() => {
     const taxable = items.reduce((sum, item) => sum + item.quantity * item.unitValue, 0)
@@ -61,19 +77,46 @@ export default function NewDocumentPage() {
 
   const currencySymbol = currency === 'PEN' ? 'S/' : '$'
 
-  function addItem(type: ItemType) {
+  function startNewItem(type: ItemType) {
+    setItemDraft({
+      type,
+      code: '',
+      description: '',
+      unit: type === 'PRODUCTO' ? 'UNIDAD' : 'SERVICIO',
+      quantity: '1',
+      unitValue: '',
+      igvRate: '18',
+      saveToCatalog: true,
+    })
+    setItemTypeDialogOpen(false)
+    setItemFormOpen(true)
+  }
+
+  function saveNewItem() {
+    const description = itemDraft.description.trim()
+    const quantity = Number(itemDraft.quantity)
+    const unitValue = Number(itemDraft.unitValue)
+    const igvRate = Number(itemDraft.igvRate) / 100
+
+    if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue < 0) {
+      return
+    }
+
     setItems((current) => [
       ...current,
       {
         id: Date.now(),
-        type,
-        description: type === 'PRODUCTO' ? 'Nuevo producto' : 'Nuevo servicio',
-        quantity: 1,
-        unitValue: 0,
-        igvRate: 0.18,
+        type: itemDraft.type,
+        code: itemDraft.code.trim() || undefined,
+        description,
+        unit: itemDraft.unit,
+        quantity,
+        unitValue,
+        igvRate,
+        saveToCatalog: itemDraft.saveToCatalog,
       },
     ])
-    setItemTypeDialogOpen(false)
+    setItemFormOpen(false)
   }
 
   const products = items.filter((item) => item.type === 'PRODUCTO')
@@ -215,7 +258,7 @@ export default function NewDocumentPage() {
                   items={products}
                   currencySymbol={currencySymbol}
                   emptyText="Aún no has agregado productos."
-                  onAdd={() => addItem('PRODUCTO')}
+                  onAdd={() => startNewItem('PRODUCTO')}
                   onRemove={removeItem}
                 />
                 <ItemGroup
@@ -224,7 +267,7 @@ export default function NewDocumentPage() {
                   items={services}
                   currencySymbol={currencySymbol}
                   emptyText="Aún no has agregado servicios."
-                  onAdd={() => addItem('SERVICIO')}
+                  onAdd={() => startNewItem('SERVICIO')}
                   onRemove={removeItem}
                 />
               </div>
@@ -346,7 +389,7 @@ export default function NewDocumentPage() {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <button
-                onClick={() => addItem('PRODUCTO')}
+                onClick={() => startNewItem('PRODUCTO')}
                 className="rounded-2xl border border-slate-200 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
               >
                 <div className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
@@ -357,7 +400,7 @@ export default function NewDocumentPage() {
               </button>
 
               <button
-                onClick={() => addItem('SERVICIO')}
+                onClick={() => startNewItem('SERVICIO')}
                 className="rounded-2xl border border-slate-200 p-5 text-left transition hover:border-blue-300 hover:bg-blue-50"
               >
                 <div className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
@@ -365,6 +408,170 @@ export default function NewDocumentPage() {
                 </div>
                 <p className="mt-4 font-semibold text-slate-950">Servicio</p>
                 <p className="mt-1 text-sm leading-5 text-slate-500">Trabajo, instalación, mantenimiento u otro servicio.</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {itemFormOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-end bg-slate-950/35 p-0 backdrop-blur-[2px] sm:place-items-center sm:p-6"
+          onMouseDown={() => setItemFormOpen(false)}
+        >
+          <div
+            className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-3xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white px-5 py-5 sm:px-6">
+              <div className="flex items-start gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                  {itemDraft.type === 'PRODUCTO' ? <Package className="size-5" /> : <Wrench className="size-5" />}
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-950">
+                    Nuevo {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Completa los datos que se mostrarán en el comprobante.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setItemFormOpen(false)}
+                className="grid size-9 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-5 py-5 sm:px-6">
+              <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+                <Field label="Código interno (opcional)">
+                  <input
+                    value={itemDraft.code}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, code: event.target.value }))}
+                    placeholder={itemDraft.type === 'PRODUCTO' ? 'Ej. 90803' : 'Ej. SRV-001'}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  />
+                </Field>
+
+                <Field label={itemDraft.type === 'PRODUCTO' ? 'Nombre / descripción del producto' : 'Descripción del servicio'}>
+                  <input
+                    value={itemDraft.description}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, description: event.target.value }))}
+                    placeholder={itemDraft.type === 'PRODUCTO' ? 'Ej. Espárrago de aro y cambio CAC-888' : 'Ej. Servicio de cambio de llantas'}
+                    autoFocus
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  />
+                </Field>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Field label="Unidad">
+                  <select
+                    value={itemDraft.unit}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, unit: event.target.value }))}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  >
+                    <option value="UNIDAD">Unidad</option>
+                    <option value="SERVICIO">Servicio</option>
+                    <option value="HORA">Hora</option>
+                    <option value="DIA">Día</option>
+                    <option value="METRO">Metro</option>
+                    <option value="KILOGRAMO">Kilogramo</option>
+                  </select>
+                </Field>
+
+                <Field label="Cantidad">
+                  <input
+                    inputMode="decimal"
+                    value={itemDraft.quantity}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, quantity: event.target.value }))}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  />
+                </Field>
+
+                <Field label={`Valor unitario (${currencySymbol})`}>
+                  <input
+                    inputMode="decimal"
+                    value={itemDraft.unitValue}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, unitValue: event.target.value }))}
+                    placeholder="0.00"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  />
+                </Field>
+
+                <Field label="IGV">
+                  <select
+                    value={itemDraft.igvRate}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, igvRate: event.target.value }))}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  >
+                    <option value="18">Gravado - 18%</option>
+                    <option value="0">0% (preparado para otras afectaciones)</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={itemDraft.saveToCatalog}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, saveToCatalog: event.target.checked }))}
+                    className="mt-1 size-4 rounded border-slate-300 text-blue-600"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Guardar en el catálogo</p>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                      Si lo desmarcas, este {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'} se usará únicamente en este comprobante.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+                  <ClipboardList className="size-4" />
+                  Vista previa del cálculo
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-blue-600">Valor venta</p>
+                    <p className="mt-1 font-semibold text-blue-950">
+                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitValue) || 0)).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-600">IGV</p>
+                    <p className="mt-1 font-semibold text-blue-950">
+                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitValue) || 0)) * ((Number(itemDraft.igvRate) || 0) / 100)).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-blue-600">Total</p>
+                    <p className="mt-1 font-semibold text-blue-950">
+                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitValue) || 0)) * (1 + ((Number(itemDraft.igvRate) || 0) / 100))).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+              <button
+                onClick={() => setItemFormOpen(false)}
+                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveNewItem}
+                disabled={!itemDraft.description.trim() || Number(itemDraft.quantity) <= 0 || Number(itemDraft.unitValue) < 0 || itemDraft.unitValue === ''}
+                className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Agregar {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}
               </button>
             </div>
           </div>
@@ -423,7 +630,12 @@ function ItemGroup({
             return (
               <article key={item.id} className="bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold leading-5 text-slate-900">{item.description}</p>
+                  <div>
+                    <p className="text-sm font-semibold leading-5 text-slate-900">{item.description}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {item.code ? `${item.code} · ` : ''}{item.unit}
+                    </p>
+                  </div>
                   <button
                     onClick={() => onRemove(item.id)}
                     className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
