@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 const metrics = [
   { label: 'Ventas del mes', value: 'S/ 0.00', detail: 'Septiembre 2026' },
@@ -18,6 +19,8 @@ const metrics = [
 ]
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
+
   return (
     <div className="min-h-dvh bg-slate-50">
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur">
@@ -75,9 +78,12 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+            <button
+              onClick={() => navigate('/comprobantes/nuevo')}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            >
               <Plus className="size-4" />
-              Nueva factura
+              Nuevo comprobante
             </button>
           </div>
 
@@ -117,7 +123,7 @@ export default function DashboardPage() {
         <div className="mx-auto grid max-w-md grid-cols-4">
           <MobileNavItem icon={Home} label="Inicio" active />
           <MobileNavItem icon={Users} label="Clientes" />
-          <MobileNavItem icon={Plus} label="Nueva" emphasized />
+          <MobileNavItem icon={Plus} label="Nueva" emphasized onClick={() => navigate('/comprobantes/nuevo')} />
           <MobileNavItem icon={FileText} label="Facturas" />
         </div>
       </nav>
@@ -151,14 +157,17 @@ function MobileNavItem({
   label,
   active = false,
   emphasized = false,
+  onClick,
 }: {
   icon: LucideIcon
   label: string
   active?: boolean
   emphasized?: boolean
+  onClick?: () => void
 }) {
   return (
     <button
+      onClick={onClick}
       className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium ${
         active ? 'text-blue-600' : 'text-slate-500'
       }`}
