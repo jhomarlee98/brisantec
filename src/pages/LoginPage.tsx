@@ -1,14 +1,45 @@
 import { Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { dniToAuthEmail, supabase } from '../utils/supabase'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
+  const [dni, setDni] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    navigate('/dashboard')
+    setAuthError('')
+
+    if (!/^\d{8}$/.test(dni)) {
+      setAuthError('Ingresa un DNI válido de 8 dígitos.')
+      return
+    }
+
+    if (!password) {
+      setAuthError('Ingresa tu contraseña.')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: dniToAuthEmail(dni),
+      password,
+    })
+
+    setIsSubmitting(false)
+
+    if (error) {
+      setAuthError('DNI o contraseña incorrectos.')
+      return
+    }
+
+    navigate('/dashboard', { replace: true })
   }
 
   return (
@@ -70,6 +101,8 @@ export default function LoginPage() {
                   inputMode="numeric"
                   autoComplete="username"
                   maxLength={8}
+                  value={dni}
+                  onChange={(event) => setDni(event.target.value.replace(/\D/g, ''))}
                   placeholder="Ingresa tu DNI"
                   className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 />
@@ -83,6 +116,8 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="Ingresa tu contraseña"
                   className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-12 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 />
@@ -97,11 +132,18 @@ export default function LoginPage() {
               </div>
             </label>
 
+            {authError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {authError}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="mt-2 h-12 w-full rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+              disabled={isSubmitting}
+              className="mt-2 h-12 w-full rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Iniciar sesión
+              {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
             </button>
           </form>
 
