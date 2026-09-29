@@ -281,7 +281,7 @@ export default function NewDocumentPage() {
     setItemFormOpen(true)
   }
 
-  function saveNewItem() {
+  async function saveNewItem() {
     const description = itemDraft.description.trim()
     const quantity = Number(itemDraft.quantity)
     const unitValue = Number(itemDraft.unitValue)
@@ -289,6 +289,37 @@ export default function NewDocumentPage() {
 
     if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue < 0) {
       return
+    }
+
+    setCatalogError('')
+
+    if (itemDraft.saveToCatalog) {
+      setCatalogSaving(true)
+
+      try {
+        const saved = await saveCatalogItem({
+          type: itemDraft.type,
+          code: itemDraft.code.trim(),
+          description,
+          unit: itemDraft.unit,
+          unitValue,
+          igvRate,
+        })
+
+        setCatalogItems((current) => {
+          const exists = current.some((item) => item.id === saved.id)
+          return exists
+            ? current.map((item) => (item.id === saved.id ? saved : item))
+            : [saved, ...current]
+        })
+      } catch (error) {
+        console.error(error)
+        setCatalogError('No se pudo guardar el producto o servicio en el catálogo.')
+        setCatalogSaving(false)
+        return
+      }
+
+      setCatalogSaving(false)
     }
 
     if (editingItemId !== null) {
@@ -328,6 +359,24 @@ export default function NewDocumentPage() {
 
     setEditingItemId(null)
     setItemFormOpen(false)
+  }
+
+  function addCatalogItemToDocument(catalogItem: CatalogItem) {
+    setItems((current) => [
+      ...current,
+      {
+        id: Date.now(),
+        type: catalogItem.type,
+        code: catalogItem.code || undefined,
+        description: catalogItem.description,
+        unit: catalogItem.unit,
+        quantity: 1,
+        unitValue: catalogItem.unitValue,
+        igvRate: catalogItem.igvRate,
+        saveToCatalog: true,
+      },
+    ])
+    setCatalogQuery('')
   }
 
   const products = items.filter((item) => item.type === 'PRODUCTO')
