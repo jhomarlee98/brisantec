@@ -1039,7 +1039,7 @@ export default function NewDocumentPage() {
                 </Field>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Unidad">
                   <select
                     value={itemDraft.unit}
@@ -1064,7 +1064,7 @@ export default function NewDocumentPage() {
                   />
                 </Field>
 
-                <Field label={`${itemDraft.priceIncludesIgv ? 'Precio unitario con IGV' : 'Valor unitario sin IGV'} (${currencySymbol})`}>
+                <Field label={`Precio unitario (${currencySymbol})`}>
                   <input
                     inputMode="decimal"
                     value={itemDraft.unitPrice}
@@ -1073,34 +1073,6 @@ export default function NewDocumentPage() {
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   />
                 </Field>
-
-                <Field label="IGV">
-                  <select
-                    value={itemDraft.igvRate}
-                    onChange={(event) => setItemDraft((current) => ({ ...current, igvRate: event.target.value }))}
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                  >
-                    <option value="18">Gravado - 18%</option>
-                    <option value="0">0% (preparado para otras afectaciones)</option>
-                  </select>
-                </Field>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={itemDraft.priceIncludesIgv}
-                    onChange={(event) => setItemDraft((current) => ({ ...current, priceIncludesIgv: event.target.checked }))}
-                    className="mt-1 size-4 rounded border-slate-300 text-blue-600"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">El precio ya incluye IGV</p>
-                    <p className="mt-1 text-sm leading-5 text-slate-500">
-                      Márcalo si el importe que ingresarás ya contiene el 18% de IGV. BRISANTEC calculará automáticamente el valor sin IGV.
-                    </p>
-                  </div>
-                </label>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1129,25 +1101,26 @@ export default function NewDocumentPage() {
                   <div>
                     <p className="text-xs text-blue-600">Valor venta</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * ((itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitPrice) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitPrice) || 0)))).toFixed(2)}
+                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitPrice) || 0)) / (1 + DEFAULT_IGV_RATE)).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-600">IGV</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitPrice) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitPrice) || 0))) * ((Number(itemDraft.igvRate) || 0) / 100)).toFixed(2)}
+                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitPrice) || 0)) - (((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitPrice) || 0)) / (1 + DEFAULT_IGV_RATE))).toFixed(2)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-blue-600">Total</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv ? (Number(itemDraft.unitPrice) || 0) : (Number(itemDraft.unitPrice) || 0) * (1 + ((Number(itemDraft.igvRate) || 0) / 100)))).toFixed(2)}
+                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitPrice) || 0)).toFixed(2)}
                     </p>
                   </div>
                 </div>
+                <p className="mt-3 text-xs leading-5 text-blue-700">
+                  Ingresa el precio final de venta. BRISANTEC separa automáticamente el IGV del 18%.
+                </p>
               </div>
-            </div>
-
             <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
               <button
                 onClick={() => setItemFormOpen(false)}
@@ -1221,7 +1194,7 @@ function ItemGroup({
       ) : (
         <div className="divide-y divide-slate-200">
           {items.map((item) => {
-            const lineTotal = item.quantity * item.unitPrice * (1 + item.igvRate)
+            const lineTotal = item.quantity * item.unitPrice
             return (
               <article key={item.id} className="bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -1255,7 +1228,7 @@ function ItemGroup({
                     <p className="mt-1 font-medium text-slate-800">{item.quantity}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Valor unit.</p>
+                    <p className="text-xs text-slate-400">Precio unit.</p>
                     <p className="mt-1 font-medium text-slate-800">{currencySymbol} {item.unitPrice.toFixed(2)}</p>
                   </div>
                   <div className="text-right">
