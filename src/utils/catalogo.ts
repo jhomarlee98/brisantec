@@ -8,9 +8,7 @@ export type CatalogItem = {
   code: string
   description: string
   unit: string
-  unitValue: number
-  igvRate: number
-  priceIncludesIgv: boolean
+  salePrice: number
 }
 
 type CatalogRow = {
@@ -19,9 +17,7 @@ type CatalogRow = {
   codigo: string | null
   descripcion: string
   unidad: string
-  valor_unitario: number | string
-  igv_rate: number | string
-  precio_incluye_igv: boolean
+  precio_venta: number | string
 }
 
 function mapCatalogItem(row: CatalogRow): CatalogItem {
@@ -31,16 +27,14 @@ function mapCatalogItem(row: CatalogRow): CatalogItem {
     code: row.codigo ?? '',
     description: row.descripcion,
     unit: row.unidad,
-    unitValue: Number(row.valor_unitario),
-    igvRate: Number(row.igv_rate),
-    priceIncludesIgv: row.precio_incluye_igv,
+    salePrice: Number(row.precio_venta),
   }
 }
 
 export async function listCatalogItems(): Promise<CatalogItem[]> {
   const { data, error } = await supabase
     .from('catalogo_items')
-    .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate, precio_incluye_igv')
+    .select('id, tipo, codigo, descripcion, unidad, precio_venta')
     .eq('activo', true)
     .order('descripcion', { ascending: true })
 
@@ -67,14 +61,12 @@ export async function saveCatalogItem(input: Omit<CatalogItem, 'id'>): Promise<C
         .update({
           descripcion: input.description,
           unidad: input.unit,
-          valor_unitario: input.unitValue,
-          igv_rate: input.igvRate,
-          precio_incluye_igv: input.priceIncludesIgv,
+          precio_venta: input.salePrice,
           activo: true,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
-        .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate, precio_incluye_igv')
+        .select('id, tipo, codigo, descripcion, unidad, precio_venta')
         .single()
 
       if (error) throw error
@@ -89,11 +81,9 @@ export async function saveCatalogItem(input: Omit<CatalogItem, 'id'>): Promise<C
       codigo: normalizedCode,
       descripcion: input.description,
       unidad: input.unit,
-      valor_unitario: input.unitValue,
-      igv_rate: input.igvRate,
-      precio_incluye_igv: input.priceIncludesIgv,
+      precio_venta: input.salePrice,
     })
-    .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate, precio_incluye_igv')
+    .select('id, tipo, codigo, descripcion, unidad, precio_venta')
     .single()
 
   if (error) throw error
