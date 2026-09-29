@@ -89,3 +89,35 @@ export async function saveCatalogItem(input: Omit<CatalogItem, 'id'>): Promise<C
   if (error) throw error
   return mapCatalogItem(data as CatalogRow)
 }
+
+
+export async function updateCatalogItem(id: string, input: Omit<CatalogItem, 'id'>): Promise<CatalogItem> {
+  const { data, error } = await supabase
+    .from('catalogo_items')
+    .update({
+      tipo: input.type,
+      codigo: input.code.trim() || null,
+      descripcion: input.description,
+      unidad: input.unit,
+      precio_venta: input.salePrice,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('id, tipo, codigo, descripcion, unidad, precio_venta')
+    .single()
+
+  if (error) throw error
+  return mapCatalogItem(data as CatalogRow)
+}
+
+export async function deactivateCatalogItem(id: string) {
+  const { error } = await supabase
+    .from('catalogo_items')
+    .update({
+      activo: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  if (error) throw error
+}
