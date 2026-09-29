@@ -598,6 +598,8 @@ export default function NewDocumentPage() {
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <input
+                    value={catalogQuery}
+                    onChange={(event) => setCatalogQuery(event.target.value)}
                     placeholder="Buscar en productos o servicios..."
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   />
@@ -610,6 +612,49 @@ export default function NewDocumentPage() {
                   Agregar
                 </button>
               </div>
+
+              {catalogError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {catalogError}
+                </div>
+              )}
+
+              {catalogLoading && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Cargando catálogo...
+                </div>
+              )}
+
+              {!catalogLoading && catalogQuery.trim() && (
+                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  {filteredCatalogItems.length > 0 ? (
+                    <div className="divide-y divide-slate-100">
+                      {filteredCatalogItems.slice(0, 6).map((catalogItem) => (
+                        <button
+                          key={catalogItem.id}
+                          type="button"
+                          onClick={() => addCatalogItemToDocument(catalogItem)}
+                          className="flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{catalogItem.description}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {catalogItem.type === 'PRODUCTO' ? 'Producto' : 'Servicio'}
+                              {catalogItem.code ? ` · ${catalogItem.code}` : ''}
+                              {` · ${currencySymbol} ${catalogItem.unitValue.toFixed(2)}`}
+                            </p>
+                          </div>
+                          <span className="text-xs font-semibold text-blue-600">Agregar</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-sm text-slate-500">
+                      No se encontraron coincidencias en el catálogo.
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-5 grid gap-4 xl:grid-cols-2">
                 <ItemGroup
@@ -1091,10 +1136,14 @@ export default function NewDocumentPage() {
               </button>
               <button
                 onClick={saveNewItem}
-                disabled={!itemDraft.description.trim() || Number(itemDraft.quantity) <= 0 || Number(itemDraft.unitValue) < 0 || itemDraft.unitValue === ''}
+                disabled={catalogSaving || !itemDraft.description.trim() || Number(itemDraft.quantity) <= 0 || Number(itemDraft.unitValue) < 0 || itemDraft.unitValue === ''}
                 className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {editingItemId !== null ? 'Guardar cambios' : `Agregar ${itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}`}
+                {catalogSaving
+                  ? 'Guardando...'
+                  : editingItemId !== null
+                    ? 'Guardar cambios'
+                    : `Agregar ${itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'}`}
               </button>
             </div>
           </div>
