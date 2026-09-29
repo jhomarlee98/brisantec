@@ -10,6 +10,7 @@ export type CatalogItem = {
   unit: string
   unitValue: number
   igvRate: number
+  priceIncludesIgv: boolean
 }
 
 type CatalogRow = {
@@ -20,6 +21,7 @@ type CatalogRow = {
   unidad: string
   valor_unitario: number | string
   igv_rate: number | string
+  precio_incluye_igv: boolean
 }
 
 function mapCatalogItem(row: CatalogRow): CatalogItem {
@@ -31,13 +33,14 @@ function mapCatalogItem(row: CatalogRow): CatalogItem {
     unit: row.unidad,
     unitValue: Number(row.valor_unitario),
     igvRate: Number(row.igv_rate),
+    priceIncludesIgv: row.precio_incluye_igv,
   }
 }
 
 export async function listCatalogItems(): Promise<CatalogItem[]> {
   const { data, error } = await supabase
     .from('catalogo_items')
-    .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate')
+    .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate, precio_incluye_igv')
     .eq('activo', true)
     .order('descripcion', { ascending: true })
 
@@ -66,11 +69,12 @@ export async function saveCatalogItem(input: Omit<CatalogItem, 'id'>): Promise<C
           unidad: input.unit,
           valor_unitario: input.unitValue,
           igv_rate: input.igvRate,
+          precio_incluye_igv: input.priceIncludesIgv,
           activo: true,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
-        .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate')
+        .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate, precio_incluye_igv')
         .single()
 
       if (error) throw error
@@ -87,8 +91,9 @@ export async function saveCatalogItem(input: Omit<CatalogItem, 'id'>): Promise<C
       unidad: input.unit,
       valor_unitario: input.unitValue,
       igv_rate: input.igvRate,
+      precio_incluye_igv: input.priceIncludesIgv,
     })
-    .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate')
+    .select('id, tipo, codigo, descripcion, unidad, valor_unitario, igv_rate, precio_incluye_igv')
     .single()
 
   if (error) throw error
