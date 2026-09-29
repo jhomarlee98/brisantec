@@ -4,6 +4,7 @@ import {
   Home,
   LogOut,
   Menu,
+  Package,
   Plus,
   ReceiptText,
   Settings,
@@ -62,6 +63,7 @@ export default function DashboardPage() {
             <NavItem icon={Home} label="Inicio" active />
             <NavItem icon={FileText} label="Comprobantes" />
             <NavItem icon={Users} label="Clientes" onClick={() => navigate("/clientes")} />
+            <NavItem icon={Package} label="Productos y servicios" onClick={() => navigate("/catalogo")} />
             <NavItem icon={HandCoins} label="Pagos" />
             <NavItem icon={Settings} label="Configuración" />
           </nav>
@@ -133,7 +135,7 @@ export default function DashboardPage() {
           <MobileNavItem icon={Home} label="Inicio" active />
           <MobileNavItem icon={Users} label="Clientes" onClick={() => navigate("/clientes")} />
           <MobileNavItem icon={Plus} label="Nueva" emphasized onClick={() => navigate('/comprobantes/nuevo')} />
-          <MobileNavItem icon={FileText} label="Facturas" />
+          <MobileNavItem icon={Package} label="Catálogo" onClick={() => navigate('/catalogo')} />
         </div>
       </nav>
     </div>
