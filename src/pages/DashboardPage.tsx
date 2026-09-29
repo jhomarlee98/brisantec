@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../utils/supabase'
 
 const metrics = [
   { label: 'Ventas del mes', value: 'S/ 0.00', detail: 'Septiembre 2026' },
@@ -20,6 +21,11 @@ const metrics = [
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -60,7 +66,10 @@ export default function DashboardPage() {
             <NavItem icon={Settings} label="Configuración" />
           </nav>
 
-          <button className="mt-auto flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
+          <button
+            onClick={handleLogout}
+            className="mt-auto flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+          >
             <LogOut className="size-5" />
             Cerrar sesión
           </button>
