@@ -15,25 +15,14 @@ import {
   X,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { createClient, listClients, type Client, type ClientDocumentType } from '../utils/clientes'
 
 type DocumentType = '01' | '03'
 type Currency = 'PEN' | 'USD'
 type PaymentCondition = 'CONTADO' | 'CREDITO'
 type ItemType = 'PRODUCTO' | 'SERVICIO'
-type ClientDocumentType = 'RUC' | 'DNI'
-
-type Client = {
-  id: number
-  documentType: ClientDocumentType
-  documentNumber: string
-  name: string
-  email?: string
-  phone?: string
-  addresses: string[]
-}
-
 type Item = {
   id: number
   type: ItemType
@@ -66,9 +55,12 @@ export default function NewDocumentPage() {
   const [items, setItems] = useState<Item[]>(initialItems)
   const [clients, setClients] = useState<Client[]>([])
   const [clientQuery, setClientQuery] = useState('')
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null)
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [selectedAddress, setSelectedAddress] = useState('')
   const [clientFormOpen, setClientFormOpen] = useState(false)
+  const [clientsLoading, setClientsLoading] = useState(true)
+  const [clientSaving, setClientSaving] = useState(false)
+  const [clientError, setClientError] = useState('')
   const [clientDraft, setClientDraft] = useState({
     documentType: 'RUC' as ClientDocumentType,
     documentNumber: '',
@@ -90,6 +82,26 @@ export default function NewDocumentPage() {
     igvRate: '18',
     saveToCatalog: true,
   })
+
+  useEffect(() => {
+    let active = true
+
+    listClients()
+      .then((data) => {
+        if (active) setClients(data)
+      })
+      .catch((error) => {
+        console.error(error)
+        if (active) setClientError('No se pudieron cargar los clientes desde Supabase.')
+      })
+      .finally(() => {
+        if (active) setClientsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const totals = useMemo(() => {
     const taxable = items.reduce((sum, item) => sum + item.quantity * item.unitValue, 0)
@@ -155,7 +167,7 @@ export default function NewDocumentPage() {
     }))
   }
 
-  function saveQuickClient() {
+  async function saveQuickClient() {
     const expectedLength = clientDraft.documentType === 'RUC' ? 11 : 8
     const documentNumber = clientDraft.documentNumber.trim()
     const name = clientDraft.name.trim()
@@ -176,21 +188,30 @@ export default function NewDocumentPage() {
       return
     }
 
-    const newClient: Client = {
-      id: Date.now(),
-      documentType: clientDraft.documentType,
-      documentNumber,
-      name,
-      email: clientDraft.email.trim() || undefined,
-      phone: clientDraft.phone.trim() || undefined,
-      addresses: clientDraft.addresses.map((address) => address.trim()).filter(Boolean),
-    }
+    setClientSaving(true)
+    setClientError('')
 
-    setClients((current) => [newClient, ...current])
-    setSelectedClientId(newClient.id)
-    setClientQuery(newClient.documentNumber)
-    setSelectedAddress(newClient.addresses[0] ?? '')
-    setClientFormOpen(false)
+    try {
+      const newClient = await createClient({
+        documentType: clientDraft.documentType,
+        documentNumber,
+        name,
+        email: clientDraft.email.trim(),
+        phone: clientDraft.phone.trim(),
+        addresses: clientDraft.addresses.map((address) => address.trim()).filter(Boolean),
+      })
+
+      setClients((current) => [newClient, ...current])
+      setSelectedClientId(newClient.id)
+      setClientQuery(newClient.documentNumber)
+      setSelectedAddress(newClient.addresses[0] ?? '')
+      setClientFormOpen(false)
+    } catch (error) {
+      console.error(error)
+      setClientError('No se pudo registrar el cliente. Verifica que el documento no exista y que RLS permita insertar.')
+    } finally {
+      setClientSaving(false)
+    }
   }
 
   function startNewItem(type: ItemType) {
@@ -374,7 +395,19 @@ export default function NewDocumentPage() {
                 </button>
               </div>
 
-              {!selectedClient && clientQuery.trim() && (
+              {clientError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {clientError}
+                </div>
+              )}
+
+              {clientsLoading && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Cargando clientes...
+                </div>
+              )}
+
+              {!clientsLoading && !selectedClient && clientQuery.trim() && (
                 <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
                   {filteredClients.length > 0 ? (
                     <div className="divide-y divide-slate-100">
@@ -753,13 +786,14 @@ export default function NewDocumentPage() {
                 type="button"
                 onClick={saveQuickClient}
                 disabled={
+                  clientSaving ||
                   !clientDraft.name.trim() ||
                   !/^\d+$/.test(clientDraft.documentNumber) ||
                   clientDraft.documentNumber.length !== (clientDraft.documentType === 'RUC' ? 11 : 8)
                 }
                 className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Guardar y seleccionar
+                {clientSaving ? 'Guardando...' : 'Guardar y seleccionar'}
               </button>
             </div>
           </div>
