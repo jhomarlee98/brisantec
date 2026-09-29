@@ -1121,6 +1121,8 @@ export default function NewDocumentPage() {
                   Ingresa el precio final de venta. BRISANTEC separa automáticamente el IGV del 18%.
                 </p>
               </div>
+            </div>
+
             <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
               <button
                 onClick={() => setItemFormOpen(false)}
