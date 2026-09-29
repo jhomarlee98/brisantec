@@ -1,35 +1,45 @@
 import { ArrowLeft, Building2, MapPin, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react'
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-type ClientType = 'RUC' | 'DNI'
-
-type Client = {
-  id: number
-  documentType: ClientType
-  documentNumber: string
-  name: string
-  email: string
-  phone: string
-  addresses: string[]
-}
-
-const initialClients: Client[] = []
+import { createClient, deleteClient, listClients, updateClient, type Client, type ClientDocumentType } from '../utils/clientes'
 
 export default function ClientsPage() {
   const navigate = useNavigate()
-  const [clients, setClients] = useState<Client[]>(initialClients)
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [pageError, setPageError] = useState('')
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState({
-    documentType: 'RUC' as ClientType,
+    documentType: 'RUC' as ClientDocumentType,
     documentNumber: '',
     name: '',
     email: '',
     phone: '',
     addresses: [''],
   })
+
+  useEffect(() => {
+    let active = true
+
+    listClients()
+      .then((data) => {
+        if (active) setClients(data)
+      })
+      .catch((error) => {
+        console.error(error)
+        if (active) setPageError('No se pudieron cargar los clientes. Revisa las políticas de Supabase.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const filteredClients = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -90,39 +100,58 @@ export default function ClientsPage() {
     }))
   }
 
-  function saveClient(event: FormEvent<HTMLFormElement>) {
+  async function saveClient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const documentNumber = draft.documentNumber.trim()
     const name = draft.name.trim()
     const addresses = draft.addresses.map((address) => address.trim()).filter(Boolean)
-
     const expectedLength = draft.documentType === 'RUC' ? 11 : 8
+
     if (!/^\d+$/.test(documentNumber) || documentNumber.length !== expectedLength || !name) {
       return
     }
 
-    const nextClient: Client = {
-      id: editingId ?? Date.now(),
-      documentType: draft.documentType,
-      documentNumber,
-      name,
-      email: draft.email.trim(),
-      phone: draft.phone.trim(),
-      addresses,
-    }
+    setSaving(true)
+    setPageError('')
 
-    if (editingId === null) {
-      setClients((current) => [nextClient, ...current])
-    } else {
-      setClients((current) => current.map((client) => (client.id === editingId ? nextClient : client)))
-    }
+    try {
+      const payload = {
+        documentType: draft.documentType,
+        documentNumber,
+        name,
+        email: draft.email.trim(),
+        phone: draft.phone.trim(),
+        addresses,
+      }
 
-    setFormOpen(false)
+      if (editingId === null) {
+        const created = await createClient(payload)
+        setClients((current) => [created, ...current])
+      } else {
+        const updated = await updateClient(editingId, payload)
+        setClients((current) => current.map((client) => (client.id === editingId ? updated : client)))
+      }
+
+      setFormOpen(false)
+    } catch (error) {
+      console.error(error)
+      setPageError('No se pudo guardar el cliente. Verifica que el documento no esté duplicado y que RLS permita la operación.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function removeClient(id: number) {
-    setClients((current) => current.filter((client) => client.id !== id))
+  async function removeClient(id: string) {
+    setPageError('')
+
+    try {
+      await deleteClient(id)
+      setClients((current) => current.filter((client) => client.id !== id))
+    } catch (error) {
+      console.error(error)
+      setPageError('No se pudo eliminar el cliente.')
+    }
   }
 
   const expectedDocumentLength = draft.documentType === 'RUC' ? 11 : 8
@@ -181,7 +210,20 @@ export default function ClientsPage() {
             </div>
           </div>
 
-          {filteredClients.length === 0 ? (
+          {pageError && (
+            <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 sm:px-5">
+              {pageError}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="grid min-h-64 place-items-center px-6 py-12 text-center">
+              <div>
+                <div className="mx-auto size-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+                <p className="mt-3 text-sm text-slate-500">Cargando clientes...</p>
+              </div>
+            </div>
+          ) : filteredClients.length === 0 ? (
             <div className="grid min-h-80 place-items-center px-6 py-12 text-center">
               <div className="max-w-md">
                 <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-slate-100 text-slate-500">
@@ -301,7 +343,7 @@ export default function ClientsPage() {
                     onChange={(event) =>
                       setDraft((current) => ({
                         ...current,
-                        documentType: event.target.value as ClientType,
+                        documentType: event.target.value as ClientDocumentType,
                         documentNumber: '',
                       }))
                     }
@@ -418,10 +460,10 @@ export default function ClientsPage() {
               </button>
               <button
                 type="submit"
-                disabled={!validDocument || !draft.name.trim()}
+                disabled={saving || !validDocument || !draft.name.trim()}
                 className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {editingId === null ? 'Guardar cliente' : 'Guardar cambios'}
+                {saving ? 'Guardando...' : editingId === null ? 'Guardar cliente' : 'Guardar cambios'}
               </button>
             </div>
           </form>
