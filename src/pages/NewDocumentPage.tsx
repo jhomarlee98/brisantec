@@ -33,6 +33,7 @@ type Item = {
   quantity: number
   unitValue: number
   igvRate: number
+  priceIncludesIgv?: boolean
   saveToCatalog?: boolean
 }
 
@@ -86,6 +87,7 @@ export default function NewDocumentPage() {
     quantity: '1',
     unitValue: '',
     igvRate: '18',
+    priceIncludesIgv: false,
     saveToCatalog: true,
   })
 
@@ -259,6 +261,7 @@ export default function NewDocumentPage() {
       quantity: '1',
       unitValue: '',
       igvRate: '18',
+      priceIncludesIgv: false,
       saveToCatalog: true,
     })
     setEditingItemId(null)
@@ -276,6 +279,7 @@ export default function NewDocumentPage() {
       quantity: String(item.quantity),
       unitValue: String(item.unitValue),
       igvRate: String(Math.round(item.igvRate * 100)),
+      priceIncludesIgv: item.priceIncludesIgv ?? false,
       saveToCatalog: item.saveToCatalog ?? false,
     })
     setItemFormOpen(true)
@@ -284,10 +288,13 @@ export default function NewDocumentPage() {
   async function saveNewItem() {
     const description = itemDraft.description.trim()
     const quantity = Number(itemDraft.quantity)
-    const unitValue = Number(itemDraft.unitValue)
+    const enteredPrice = Number(itemDraft.unitValue)
     const igvRate = Number(itemDraft.igvRate) / 100
+    const unitValue = itemDraft.priceIncludesIgv && igvRate > 0
+      ? enteredPrice / (1 + igvRate)
+      : enteredPrice
 
-    if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitValue) || unitValue < 0) {
+    if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(enteredPrice) || enteredPrice < 0) {
       return
     }
 
@@ -304,6 +311,7 @@ export default function NewDocumentPage() {
           unit: itemDraft.unit,
           unitValue,
           igvRate,
+          priceIncludesIgv: itemDraft.priceIncludesIgv,
         })
 
         setCatalogItems((current) => {
@@ -335,6 +343,7 @@ export default function NewDocumentPage() {
                 quantity,
                 unitValue,
                 igvRate,
+                priceIncludesIgv: itemDraft.priceIncludesIgv,
                 saveToCatalog: itemDraft.saveToCatalog,
               }
             : item,
@@ -352,6 +361,7 @@ export default function NewDocumentPage() {
           quantity,
           unitValue,
           igvRate,
+          priceIncludesIgv: itemDraft.priceIncludesIgv,
           saveToCatalog: itemDraft.saveToCatalog,
         },
       ])
@@ -373,6 +383,7 @@ export default function NewDocumentPage() {
         quantity: 1,
         unitValue: catalogItem.unitValue,
         igvRate: catalogItem.igvRate,
+        priceIncludesIgv: catalogItem.priceIncludesIgv,
         saveToCatalog: true,
       },
     ])
@@ -1060,7 +1071,7 @@ export default function NewDocumentPage() {
                   />
                 </Field>
 
-                <Field label={`Valor unitario (${currencySymbol})`}>
+                <Field label={`${itemDraft.priceIncludesIgv ? 'Precio unitario con IGV' : 'Valor unitario sin IGV'} (${currencySymbol})`}>
                   <input
                     inputMode="decimal"
                     value={itemDraft.unitValue}
@@ -1080,6 +1091,23 @@ export default function NewDocumentPage() {
                     <option value="0">0% (preparado para otras afectaciones)</option>
                   </select>
                 </Field>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={itemDraft.priceIncludesIgv}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, priceIncludesIgv: event.target.checked }))}
+                    className="mt-1 size-4 rounded border-slate-300 text-blue-600"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">El precio ya incluye IGV</p>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                      Márcalo si el importe que ingresarás ya contiene el 18% de IGV. BRISANTEC calculará automáticamente el valor sin IGV.
+                    </p>
+                  </div>
+                </label>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1108,19 +1136,19 @@ export default function NewDocumentPage() {
                   <div>
                     <p className="text-xs text-blue-600">Valor venta</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitValue) || 0)).toFixed(2)}
+                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * ((itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitValue) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitValue) || 0)))).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-600">IGV</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitValue) || 0)) * ((Number(itemDraft.igvRate) || 0) / 100)).toFixed(2)}
+                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitValue) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitValue) || 0))) * ((Number(itemDraft.igvRate) || 0) / 100)).toFixed(2)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-blue-600">Total</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (Number(itemDraft.unitValue) || 0)) * (1 + ((Number(itemDraft.igvRate) || 0) / 100))).toFixed(2)}
+                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv ? (Number(itemDraft.unitValue) || 0) : (Number(itemDraft.unitValue) || 0) * (1 + ((Number(itemDraft.igvRate) || 0) / 100)))).toFixed(2)}
                     </p>
                   </div>
                 </div>
