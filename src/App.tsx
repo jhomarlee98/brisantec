@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import CatalogPage from './pages/CatalogPage'
 import ClientsPage from './pages/ClientsPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
@@ -51,6 +52,10 @@ export default function App() {
       <Route
         path="/clientes"
         element={session ? <ClientsPage /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/catalogo"
+        element={session ? <CatalogPage /> : <Navigate to="/login" replace />}
       />
       <Route
         path="/comprobantes/nuevo"
