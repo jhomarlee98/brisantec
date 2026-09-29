@@ -24,6 +24,7 @@ type DocumentType = '01' | '03'
 type Currency = 'PEN' | 'USD'
 type PaymentCondition = 'CONTADO' | 'CREDITO'
 type ItemType = 'PRODUCTO' | 'SERVICIO'
+const DEFAULT_IGV_RATE = 0.18
 type Item = {
   id: number
   type: ItemType
@@ -31,9 +32,8 @@ type Item = {
   description: string
   unit: string
   quantity: number
-  unitValue: number
+  unitPrice: number
   igvRate: number
-  priceIncludesIgv?: boolean
   saveToCatalog?: boolean
 }
 
@@ -44,7 +44,7 @@ const initialItems: Item[] = [
     description: 'ESPÁRRAGO DE ARO Y CAMBIO CAC-888',
     unit: 'UNIDAD',
     quantity: 2,
-    unitValue: 13.42,
+    unitPrice: 15.83,
     igvRate: 0.18,
   },
 ]
@@ -85,9 +85,7 @@ export default function NewDocumentPage() {
     description: '',
     unit: 'UNIDAD',
     quantity: '1',
-    unitValue: '',
-    igvRate: '18',
-    priceIncludesIgv: false,
+    unitPrice: '',
     saveToCatalog: true,
   })
 
@@ -132,13 +130,20 @@ export default function NewDocumentPage() {
   }, [])
 
   const totals = useMemo(() => {
-    const taxable = items.reduce((sum, item) => sum + item.quantity * item.unitValue, 0)
-    const igv = items.reduce((sum, item) => sum + item.quantity * item.unitValue * item.igvRate, 0)
-    return {
-      taxable,
-      igv,
-      total: taxable + igv,
-    }
+    return items.reduce(
+      (acc, item) => {
+        const lineTotal = item.quantity * item.unitPrice
+        const lineTaxable = item.igvRate > 0 ? lineTotal / (1 + item.igvRate) : lineTotal
+        const lineIgv = lineTotal - lineTaxable
+
+        return {
+          taxable: acc.taxable + lineTaxable,
+          igv: acc.igv + lineIgv,
+          total: acc.total + lineTotal,
+        }
+      },
+      { taxable: 0, igv: 0, total: 0 },
+    )
   }, [items])
 
   const currencySymbol = currency === 'PEN' ? 'S/' : '$'
@@ -259,9 +264,7 @@ export default function NewDocumentPage() {
       description: '',
       unit: type === 'PRODUCTO' ? 'UNIDAD' : 'SERVICIO',
       quantity: '1',
-      unitValue: '',
-      igvRate: '18',
-      priceIncludesIgv: false,
+      unitPrice: '',
       saveToCatalog: true,
     })
     setEditingItemId(null)
@@ -277,9 +280,7 @@ export default function NewDocumentPage() {
       description: item.description,
       unit: item.unit,
       quantity: String(item.quantity),
-      unitValue: String(item.unitValue),
-      igvRate: String(Math.round(item.igvRate * 100)),
-      priceIncludesIgv: item.priceIncludesIgv ?? false,
+      unitPrice: String(item.unitPrice),
       saveToCatalog: item.saveToCatalog ?? false,
     })
     setItemFormOpen(true)
@@ -288,13 +289,10 @@ export default function NewDocumentPage() {
   async function saveNewItem() {
     const description = itemDraft.description.trim()
     const quantity = Number(itemDraft.quantity)
-    const enteredPrice = Number(itemDraft.unitValue)
-    const igvRate = Number(itemDraft.igvRate) / 100
-    const unitValue = itemDraft.priceIncludesIgv && igvRate > 0
-      ? enteredPrice / (1 + igvRate)
-      : enteredPrice
+    const unitPrice = Number(itemDraft.unitPrice)
+    const igvRate = DEFAULT_IGV_RATE
 
-    if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(enteredPrice) || enteredPrice < 0) {
+    if (!description || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
       return
     }
 
@@ -309,9 +307,7 @@ export default function NewDocumentPage() {
           code: itemDraft.code.trim(),
           description,
           unit: itemDraft.unit,
-          unitValue,
-          igvRate,
-          priceIncludesIgv: itemDraft.priceIncludesIgv,
+          salePrice: unitPrice,
         })
 
         setCatalogItems((current) => {
@@ -341,9 +337,8 @@ export default function NewDocumentPage() {
                 description,
                 unit: itemDraft.unit,
                 quantity,
-                unitValue,
+                unitPrice,
                 igvRate,
-                priceIncludesIgv: itemDraft.priceIncludesIgv,
                 saveToCatalog: itemDraft.saveToCatalog,
               }
             : item,
@@ -359,9 +354,8 @@ export default function NewDocumentPage() {
           description,
           unit: itemDraft.unit,
           quantity,
-          unitValue,
+          unitPrice,
           igvRate,
-          priceIncludesIgv: itemDraft.priceIncludesIgv,
           saveToCatalog: itemDraft.saveToCatalog,
         },
       ])
@@ -381,9 +375,8 @@ export default function NewDocumentPage() {
         description: catalogItem.description,
         unit: catalogItem.unit,
         quantity: 1,
-        unitValue: catalogItem.unitValue,
-        igvRate: catalogItem.igvRate,
-        priceIncludesIgv: catalogItem.priceIncludesIgv,
+        unitPrice: catalogItem.salePrice,
+        igvRate: DEFAULT_IGV_RATE,
         saveToCatalog: true,
       },
     ])
@@ -652,7 +645,7 @@ export default function NewDocumentPage() {
                             <p className="mt-1 text-xs text-slate-500">
                               {catalogItem.type === 'PRODUCTO' ? 'Producto' : 'Servicio'}
                               {catalogItem.code ? ` · ${catalogItem.code}` : ''}
-                              {` · ${currencySymbol} ${catalogItem.unitValue.toFixed(2)}`}
+                              {` · ${currencySymbol} ${catalogItem.salePrice.toFixed(2)}`}
                             </p>
                           </div>
                           <span className="text-xs font-semibold text-blue-600">Agregar</span>
@@ -1074,8 +1067,8 @@ export default function NewDocumentPage() {
                 <Field label={`${itemDraft.priceIncludesIgv ? 'Precio unitario con IGV' : 'Valor unitario sin IGV'} (${currencySymbol})`}>
                   <input
                     inputMode="decimal"
-                    value={itemDraft.unitValue}
-                    onChange={(event) => setItemDraft((current) => ({ ...current, unitValue: event.target.value }))}
+                    value={itemDraft.unitPrice}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, unitPrice: event.target.value }))}
                     placeholder="0.00"
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   />
@@ -1136,19 +1129,19 @@ export default function NewDocumentPage() {
                   <div>
                     <p className="text-xs text-blue-600">Valor venta</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * ((itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitValue) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitValue) || 0)))).toFixed(2)}
+                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * ((itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitPrice) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitPrice) || 0)))).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-600">IGV</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitValue) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitValue) || 0))) * ((Number(itemDraft.igvRate) || 0) / 100)).toFixed(2)}
+                      {currencySymbol} {(((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv && (Number(itemDraft.igvRate) || 0) > 0 ? (Number(itemDraft.unitPrice) || 0) / (1 + ((Number(itemDraft.igvRate) || 0) / 100)) : (Number(itemDraft.unitPrice) || 0))) * ((Number(itemDraft.igvRate) || 0) / 100)).toFixed(2)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-blue-600">Total</p>
                     <p className="mt-1 font-semibold text-blue-950">
-                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv ? (Number(itemDraft.unitValue) || 0) : (Number(itemDraft.unitValue) || 0) * (1 + ((Number(itemDraft.igvRate) || 0) / 100)))).toFixed(2)}
+                      {currencySymbol} {((Number(itemDraft.quantity) || 0) * (itemDraft.priceIncludesIgv ? (Number(itemDraft.unitPrice) || 0) : (Number(itemDraft.unitPrice) || 0) * (1 + ((Number(itemDraft.igvRate) || 0) / 100)))).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -1164,7 +1157,7 @@ export default function NewDocumentPage() {
               </button>
               <button
                 onClick={saveNewItem}
-                disabled={catalogSaving || !itemDraft.description.trim() || Number(itemDraft.quantity) <= 0 || Number(itemDraft.unitValue) < 0 || itemDraft.unitValue === ''}
+                disabled={catalogSaving || !itemDraft.description.trim() || Number(itemDraft.quantity) <= 0 || Number(itemDraft.unitPrice) < 0 || itemDraft.unitPrice === ''}
                 className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {catalogSaving
@@ -1228,7 +1221,7 @@ function ItemGroup({
       ) : (
         <div className="divide-y divide-slate-200">
           {items.map((item) => {
-            const lineTotal = item.quantity * item.unitValue * (1 + item.igvRate)
+            const lineTotal = item.quantity * item.unitPrice * (1 + item.igvRate)
             return (
               <article key={item.id} className="bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -1263,7 +1256,7 @@ function ItemGroup({
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Valor unit.</p>
-                    <p className="mt-1 font-medium text-slate-800">{currencySymbol} {item.unitValue.toFixed(2)}</p>
+                    <p className="mt-1 font-medium text-slate-800">{currencySymbol} {item.unitPrice.toFixed(2)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-slate-400">Importe</p>
