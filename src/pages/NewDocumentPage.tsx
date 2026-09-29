@@ -18,6 +18,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient, listClients, type Client, type ClientDocumentType } from '../utils/clientes'
+import { listCatalogItems, saveCatalogItem, type CatalogItem } from '../utils/catalogo'
 
 type DocumentType = '01' | '03'
 type Currency = 'PEN' | 'USD'
@@ -53,6 +54,11 @@ export default function NewDocumentPage() {
   const [currency, setCurrency] = useState<Currency>('PEN')
   const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>('CONTADO')
   const [items, setItems] = useState<Item[]>(initialItems)
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
+  const [catalogQuery, setCatalogQuery] = useState('')
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogSaving, setCatalogSaving] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
   const [clients, setClients] = useState<Client[]>([])
   const [clientQuery, setClientQuery] = useState('')
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
@@ -103,6 +109,26 @@ export default function NewDocumentPage() {
     }
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    listCatalogItems()
+      .then((data) => {
+        if (active) setCatalogItems(data)
+      })
+      .catch((error) => {
+        console.error(error)
+        if (active) setCatalogError('No se pudo cargar el catálogo desde Supabase.')
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const totals = useMemo(() => {
     const taxable = items.reduce((sum, item) => sum + item.quantity * item.unitValue, 0)
     const igv = items.reduce((sum, item) => sum + item.quantity * item.unitValue * item.igvRate, 0)
@@ -115,6 +141,16 @@ export default function NewDocumentPage() {
 
   const currencySymbol = currency === 'PEN' ? 'S/' : '$'
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null
+  const filteredCatalogItems = catalogItems.filter((catalogItem) => {
+    const query = catalogQuery.trim().toLowerCase()
+    if (!query) return false
+
+    return [catalogItem.code, catalogItem.description, catalogItem.type]
+      .join(' ')
+      .toLowerCase()
+      .includes(query)
+  })
+
   const filteredClients = clients.filter((client) => {
     const query = clientQuery.trim().toLowerCase()
     if (!query) return false
