@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { Installment } from './cuotas'
 
 export type DraftItem = {
   id: number
@@ -20,6 +21,7 @@ export type DraftContent = {
   address: string
   purchaseOrder: string
   exchangeRate: string
+  installments?: Installment[]
   items: DraftItem[]
 }
 export type Draft = { id: string; contenido: DraftContent; updated_at: string }

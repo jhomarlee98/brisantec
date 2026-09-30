@@ -22,6 +22,8 @@ import { listCatalogItems, saveCatalogItem, type CatalogItem } from '../utils/ca
 
 import { listDrafts, saveDraft, type Draft, type DraftContent } from '../utils/borradores'
 
+import { reviewInstallments, type Installment } from '../utils/cuotas'
+
 type DocumentType = '01' | '03'
 type Currency = 'PEN' | 'USD'
 type PaymentCondition = 'CONTADO' | 'CREDITO'
@@ -65,6 +67,7 @@ export default function NewDocumentPage() {
   const [documentType, setDocumentType] = useState<DocumentType>('01')
   const [currency, setCurrency] = useState<Currency>('PEN')
   const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>('CONTADO')
+  const [installments, setInstallments] = useState<Installment[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
   const [catalogQuery, setCatalogQuery] = useState('')
@@ -156,6 +159,8 @@ export default function NewDocumentPage() {
       { taxable: 0, igv: 0, total: 0 },
     )
   }, [items])
+
+  const installmentReview = reviewInstallments(installments, issueDate, totals.total)
 
   const currencySymbol = currency === 'PEN' ? 'S/' : '$'
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null
@@ -404,6 +409,7 @@ export default function NewDocumentPage() {
   function currentContent(): DraftContent {
     return { version: 1, documentType, currency, paymentCondition, issueDate,
       clientId: selectedClientId, address: selectedAddress, purchaseOrder, exchangeRate,
+      installments: paymentCondition === 'CREDITO' ? installments : [],
       items: items.map(({ id, type, code, description, unit, quantity, unitPrice, igvRate }) =>
         ({ id, type, code, description, unit, quantity, unitPrice, igvRate })) }
   }
@@ -423,7 +429,9 @@ export default function NewDocumentPage() {
       const saved = await saveDraft(draftId, content)
       setSavedContent(JSON.stringify(content))
       setDrafts((current) => [saved, ...current.filter((draft) => draft.id !== saved.id)])
-      setDraftMessage('Borrador guardado. Puedes recuperarlo desde esta pantalla. No ha sido emitido.')
+      setDraftMessage(content.paymentCondition === 'CREDITO' && installmentReview.errors.length > 0
+        ? 'Borrador guardado. El cronograma de cuotas está incompleto; podrás terminarlo después.'
+        : 'Borrador guardado. Puedes recuperarlo desde esta pantalla. No ha sido emitido.')
     } catch {
       setDraftError('No se pudo guardar el borrador. Tus datos siguen en el formulario; vuelve a intentarlo.')
     } finally {
@@ -434,7 +442,7 @@ export default function NewDocumentPage() {
 
   function restoreDraft(draft: Draft) {
     if (savedContent !== JSON.stringify(currentContent()) &&
-        (items.length > 0 || selectedClientId || purchaseOrder || exchangeRate) &&
+        (items.length > 0 || selectedClientId || purchaseOrder || exchangeRate || paymentCondition === 'CREDITO') &&
         !window.confirm('Hay cambios sin guardar. ¿Deseas reemplazarlos con este borrador?')) return
     const data = draft.contenido
     if (data.version !== 1 || !Array.isArray(data.items)) {
@@ -445,6 +453,7 @@ export default function NewDocumentPage() {
     setDocumentType(data.documentType)
     setCurrency(data.currency)
     setPaymentCondition(data.paymentCondition)
+    setInstallments(data.installments ?? [])
     setIssueDate(data.issueDate)
     const restoredClient = clients.find((client) => client.id === data.clientId)
     const incompatibleClient = data.documentType === '01' && restoredClient?.documentType === 'DNI'
@@ -455,14 +464,14 @@ export default function NewDocumentPage() {
     setPurchaseOrder(data.purchaseOrder)
     setExchangeRate(data.exchangeRate)
     setItems(data.items)
-    setSavedContent(JSON.stringify(data))
+    setSavedContent(JSON.stringify({ ...data, installments: data.installments ?? [] }))
     setDraftMessage('Borrador recuperado. Puedes editarlo y guardar los cambios.')
     setDraftError('')
   }
 
   const serializedContent = JSON.stringify(currentContent())
   const hasUnsavedChanges = serializedContent !== savedContent &&
-    (items.length > 0 || Boolean(selectedClientId || purchaseOrder || exchangeRate) || Boolean(savedContent))
+    (items.length > 0 || Boolean(selectedClientId || purchaseOrder || exchangeRate) || paymentCondition === 'CREDITO' || Boolean(savedContent))
   useEffect(() => {
     if (!hasUnsavedChanges) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
@@ -801,7 +810,14 @@ export default function NewDocumentPage() {
                 <Field label="Condición de pago">
                   <select
                     value={paymentCondition}
-                    onChange={(event) => setPaymentCondition(event.target.value as PaymentCondition)}
+                    onChange={(event) => {
+                      const next = event.target.value as PaymentCondition
+                      if (next === 'CONTADO' && installments.length > 0 &&
+                          !window.confirm('Al cambiar a contado se eliminarán las cuotas de este borrador. ¿Continuar?')) return
+                      setPaymentCondition(next)
+                      if (next === 'CONTADO') setInstallments([])
+                      else if (installments.length === 0) setInstallments([{ id: crypto.randomUUID(), dueDate: '', amount: totals.total > 0 ? totals.total.toFixed(2) : '' }])
+                    }}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   >
                     <option value="CONTADO">Contado</option>
@@ -821,10 +837,52 @@ export default function NewDocumentPage() {
 
               {paymentCondition === 'CREDITO' && (
                 <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                  <p className="text-sm font-semibold text-blue-900">Venta a crédito</p>
-                  <p className="mt-1 text-sm leading-6 text-blue-700">
-                    En la siguiente iteración agregaremos las cuotas y fechas de vencimiento.
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900">Cuotas de la venta a crédito</p>
+                      <p className="mt-1 text-xs text-blue-700">Los importes usan la moneda del comprobante. Puedes guardar el borrador y completar las cuotas después.</p>
+                    </div>
+                    <button type="button" onClick={() => setInstallments((current) => [...current, {
+                      id: crypto.randomUUID(), dueDate: '',
+                      amount: installmentReview.differenceCents > 0 ? (installmentReview.differenceCents / 100).toFixed(2) : '',
+                    }])} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700">
+                      <Plus className="size-4" /> Agregar cuota
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {installments.map((installment, index) => (
+                      <div key={installment.id} className="grid items-end gap-3 rounded-xl bg-white p-3 sm:grid-cols-[1fr_1fr_auto]">
+                        <label className="text-sm text-slate-700">
+                          Cuota {index + 1} · Vencimiento
+                          <input type="date" min={issueDate} value={installment.dueDate}
+                            onChange={(event) => setInstallments((current) => current.map((entry) => entry.id === installment.id ? { ...entry, dueDate: event.target.value } : entry))}
+                            className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-blue-500" />
+                        </label>
+                        <label className="text-sm text-slate-700">
+                          Importe ({currencySymbol})
+                          <input inputMode="decimal" placeholder="0.00" value={installment.amount}
+                            onChange={(event) => setInstallments((current) => current.map((entry) => entry.id === installment.id ? { ...entry, amount: event.target.value } : entry))}
+                            className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-blue-500" />
+                        </label>
+                        <button type="button" aria-label={`Eliminar cuota ${index + 1}`}
+                          onClick={() => setInstallments((current) => current.filter((entry) => entry.id !== installment.id))}
+                          className="grid size-11 place-items-center rounded-xl text-red-600 hover:bg-red-50">
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm text-blue-900" aria-live="polite">
+                    <p>Programado: {currencySymbol} {(installmentReview.scheduledCents / 100).toFixed(2)} · Total: {currencySymbol} {totals.total.toFixed(2)}</p>
+                    {installmentReview.differenceCents !== 0 && <p>
+                      {installmentReview.differenceCents > 0 ? 'Falta distribuir' : 'Exceso programado'}: {currencySymbol} {(Math.abs(installmentReview.differenceCents) / 100).toFixed(2)}
+                    </p>}
+                    {installmentReview.errors.length > 0 ? (
+                      <ul className="list-inside list-disc text-amber-800">
+                        {installmentReview.errors.map((error) => <li key={error}>{error}</li>)}
+                      </ul>
+                    ) : <p className="font-semibold text-green-700">Cronograma completo: las cuotas coinciden con el total.</p>}
+                  </div>
                 </div>
               )}
             </Section>

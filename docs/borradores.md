@@ -26,3 +26,15 @@ El JSON conserva el estado editable en una única escritura. No es un comprobant
 La compilación no sustituye las pruebas de permisos ni de persistencia contra Supabase. No se han aplicado migraciones remotas desde este cambio.
 
 Referencia oficial: https://supabase.com/docs/guides/database/postgres/row-level-security
+
+## Cuotas de ventas a crédito
+
+El formulario permite agregar, editar y quitar cuotas con fecha e importe. La suma se comprueba en centavos contra el total mostrado. Se admiten punto o coma decimal, hasta dos decimales; cada importe debe ser positivo y cada vencimiento válido y no anterior a la emisión.
+
+Un borrador incompleto se puede guardar con aviso. Las cuotas son un cronograma, no pagos registrados ni un comprobante emitido. Cambiar a contado pide confirmación y elimina las cuotas. Cambiar ítems recalcula las diferencias sin modificar automáticamente las cuotas.
+
+No requiere migración adicional: se guarda `installments` dentro del JSON existente. Los borradores antiguos sin ese campo abren con una lista vacía.
+
+Pruebas automáticas (Node 24): `node --test tests/cuotas.test.mjs`.
+
+Prueba manual pendiente en Supabase: crear una venta de 118.00 a crédito, distribuir 59.00 y 59.00 con vencimientos válidos, guardar, recargar y recuperar. Deben conservarse ambas cuotas. Cambiar una a 60.00 debe mostrar exceso de 1.00; dejar una fecha vacía debe advertir y permitir guardar como borrador incompleto. Probar cambiar a contado cancelando y aceptando la confirmación.
