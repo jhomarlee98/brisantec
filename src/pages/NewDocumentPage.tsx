@@ -15,10 +15,12 @@ import {
   X,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient, listClients, type Client, type ClientDocumentType } from '../utils/clientes'
 import { listCatalogItems, saveCatalogItem, type CatalogItem } from '../utils/catalogo'
+
+import { listDrafts, saveDraft, type Draft, type DraftContent } from '../utils/borradores'
 
 type DocumentType = '01' | '03'
 type Currency = 'PEN' | 'USD'
@@ -37,24 +39,34 @@ type Item = {
   saveToCatalog?: boolean
 }
 
-const initialItems: Item[] = [
-  {
-    id: 1,
-    type: 'PRODUCTO',
-    description: 'ESPÁRRAGO DE ARO Y CAMBIO CAC-888',
-    unit: 'UNIDAD',
-    quantity: 2,
-    unitPrice: 15.83,
-    igvRate: 0.18,
-  },
-]
-
 export default function NewDocumentPage() {
   const navigate = useNavigate()
+  const [draftId, setDraftId] = useState<string>(() => crypto.randomUUID())
+  const [issueDate, setIssueDate] = useState(() => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date()))
+  const [purchaseOrder, setPurchaseOrder] = useState('')
+  const [exchangeRate, setExchangeRate] = useState('')
+  const [drafts, setDrafts] = useState<Draft[]>([])
+  const [draftSaving, setDraftSaving] = useState(false)
+  const [draftLoading, setDraftLoading] = useState(true)
+  const [draftError, setDraftError] = useState('')
+  const [draftMessage, setDraftMessage] = useState('')
+  const saveLock = useRef(false)
+  const [savedContent, setSavedContent] = useState('')
+
+  useEffect(() => {
+    let active = true
+    listDrafts().then((data) => { if (active) setDrafts(data) })
+      .catch(() => { if (active) setDraftError('No se pudieron cargar los borradores. Intenta nuevamente; si persiste, contacta al administrador.') })
+      .finally(() => { if (active) setDraftLoading(false) })
+    return () => { active = false }
+  }, [])
+
   const [documentType, setDocumentType] = useState<DocumentType>('01')
   const [currency, setCurrency] = useState<Currency>('PEN')
   const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>('CONTADO')
-  const [items, setItems] = useState<Item[]>(initialItems)
+  const [items, setItems] = useState<Item[]>([])
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
   const [catalogQuery, setCatalogQuery] = useState('')
   const [catalogLoading, setCatalogLoading] = useState(true)
@@ -383,6 +395,68 @@ export default function NewDocumentPage() {
     setCatalogQuery('')
   }
 
+  function currentContent(): DraftContent {
+    return { version: 1, documentType, currency, paymentCondition, issueDate,
+      clientId: selectedClientId, address: selectedAddress, purchaseOrder, exchangeRate,
+      items: items.map(({ id, type, code, description, unit, quantity, unitPrice, igvRate }) =>
+        ({ id, type, code, description, unit, quantity, unitPrice, igvRate })) }
+  }
+
+  async function persistDraft() {
+    if (saveLock.current) return
+    saveLock.current = true
+    setDraftSaving(true)
+    setDraftError('')
+    setDraftMessage('')
+    const content = currentContent()
+    try {
+      const saved = await saveDraft(draftId, content)
+      setSavedContent(JSON.stringify(content))
+      setDrafts((current) => [saved, ...current.filter((draft) => draft.id !== saved.id)])
+      setDraftMessage('Borrador guardado. Puedes recuperarlo desde esta pantalla. No ha sido emitido.')
+    } catch {
+      setDraftError('No se pudo guardar el borrador. Tus datos siguen en el formulario; vuelve a intentarlo.')
+    } finally {
+      saveLock.current = false
+      setDraftSaving(false)
+    }
+  }
+
+  function restoreDraft(draft: Draft) {
+    if (savedContent !== JSON.stringify(currentContent()) &&
+        (items.length > 0 || selectedClientId || purchaseOrder || exchangeRate) &&
+        !window.confirm('Hay cambios sin guardar. ¿Deseas reemplazarlos con este borrador?')) return
+    const data = draft.contenido
+    if (data.version !== 1 || !Array.isArray(data.items)) {
+      setDraftError('Este borrador no tiene un formato compatible.')
+      return
+    }
+    setDraftId(draft.id)
+    setDocumentType(data.documentType)
+    setCurrency(data.currency)
+    setPaymentCondition(data.paymentCondition)
+    setIssueDate(data.issueDate)
+    setSelectedClientId(data.clientId)
+    setClientQuery(clients.find((client) => client.id === data.clientId)?.documentNumber ?? '')
+    setSelectedAddress(data.address)
+    setPurchaseOrder(data.purchaseOrder)
+    setExchangeRate(data.exchangeRate)
+    setItems(data.items)
+    setSavedContent(JSON.stringify(data))
+    setDraftMessage('Borrador recuperado. Puedes editarlo y guardar los cambios.')
+    setDraftError('')
+  }
+
+  const serializedContent = JSON.stringify(currentContent())
+  const hasUnsavedChanges = serializedContent !== savedContent &&
+    (items.length > 0 || Boolean(selectedClientId || purchaseOrder || exchangeRate) || Boolean(savedContent))
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [hasUnsavedChanges])
+
   const products = items.filter((item) => item.type === 'PRODUCTO')
   const services = items.filter((item) => item.type === 'SERVICIO')
 
@@ -396,7 +470,7 @@ export default function NewDocumentPage() {
         <div className="mx-auto flex h-16 max-w-[1536px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => { if (!hasUnsavedChanges || window.confirm('Hay cambios sin guardar. ¿Deseas salir?')) navigate('/dashboard') }}
               className="grid size-10 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100"
               aria-label="Volver"
             >
@@ -408,14 +482,28 @@ export default function NewDocumentPage() {
             </div>
           </div>
 
-          <button className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex">
+          <button onClick={persistDraft} disabled={draftSaving} className="disabled:opacity-50 hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex">
             <Save className="size-4" />
-            Guardar borrador
+            {draftSaving ? 'Guardando…' : 'Guardar borrador'}
           </button>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-[1536px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+        <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4" aria-label="Borradores guardados">
+          <label htmlFor="draft-selector" className="text-sm font-semibold text-slate-800">Recuperar borrador</label>
+          <select id="draft-selector" value="" disabled={draftSaving || draftLoading || clientsLoading}
+            onChange={(event) => { const draft = drafts.find((entry) => entry.id === event.target.value); if (draft) restoreDraft(draft) }}
+            className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm disabled:opacity-50">
+            <option value="">{draftLoading ? 'Cargando borradores…' : drafts.length ? 'Selecciona un borrador guardado' : 'Sin borradores guardados'}</option>
+            {drafts.map((draft) => <option key={draft.id} value={draft.id}>
+              {draft.contenido.documentType === '01' ? 'Factura' : 'Boleta'} · {draft.contenido.issueDate} · {clients.find((client) => client.id === draft.contenido.clientId)?.name ?? 'Sin cliente'} · {draft.id.slice(0, 8)}
+            </option>)}
+          </select>
+          {hasUnsavedChanges && <p className="mt-3 text-sm text-amber-700">Hay cambios sin guardar.</p>}
+          {draftMessage && !hasUnsavedChanges && <p role="status" className="mt-3 text-sm text-green-700">{draftMessage}</p>}
+          {draftError && <p role="alert" className="mt-3 text-sm text-red-700">{draftError}</p>}
+        </section>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
             <Section title="Comprobante" subtitle="Define el tipo de documento, fecha y moneda.">
@@ -436,7 +524,8 @@ export default function NewDocumentPage() {
                     <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                     <input
                       type="date"
-                      defaultValue="2026-09-28"
+                      value={issueDate}
+                      onChange={(event) => setIssueDate(event.target.value)}
                       className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     />
                   </div>
@@ -699,6 +788,8 @@ export default function NewDocumentPage() {
 
                 <Field label="Orden de compra (opcional)">
                   <input
+                    value={purchaseOrder}
+                    onChange={(event) => setPurchaseOrder(event.target.value)}
                     placeholder="Ej. OC-2026-001"
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   />
@@ -751,6 +842,8 @@ export default function NewDocumentPage() {
                   </div>
                   <input
                     inputMode="decimal"
+                    value={exchangeRate}
+                    onChange={(event) => setExchangeRate(event.target.value)}
                     placeholder="Ej. 3.45"
                     className="mt-3 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   />
@@ -760,13 +853,13 @@ export default function NewDocumentPage() {
                 </div>
               )}
 
-              <button className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-                Emitir {documentType === '01' ? 'factura' : 'boleta'}
+              <button disabled title="La emisión electrónica aún no está disponible" className="disabled:cursor-not-allowed disabled:opacity-50 mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                Emisión electrónica pendiente
               </button>
 
-              <button className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:hidden">
+              <button onClick={persistDraft} disabled={draftSaving} className="disabled:opacity-50 mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:hidden">
                 <Save className="size-4" />
-                Guardar borrador
+                {draftSaving ? 'Guardando…' : 'Guardar borrador'}
               </button>
             </div>
           </aside>
