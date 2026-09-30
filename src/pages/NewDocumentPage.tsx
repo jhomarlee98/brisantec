@@ -36,7 +36,6 @@ type Item = {
   quantity: number
   unitPrice: number
   igvRate: number
-  saveToCatalog?: boolean
 }
 
 export default function NewDocumentPage() {
@@ -293,7 +292,7 @@ export default function NewDocumentPage() {
       unit: item.unit,
       quantity: String(item.quantity),
       unitPrice: String(item.unitPrice),
-      saveToCatalog: item.saveToCatalog ?? false,
+      saveToCatalog: false,
     })
     setItemFormOpen(true)
   }
@@ -310,7 +309,7 @@ export default function NewDocumentPage() {
 
     setCatalogError('')
 
-    if (itemDraft.saveToCatalog) {
+    if (editingItemId === null && itemDraft.saveToCatalog) {
       setCatalogSaving(true)
 
       try {
@@ -351,7 +350,6 @@ export default function NewDocumentPage() {
                 quantity,
                 unitPrice,
                 igvRate,
-                saveToCatalog: itemDraft.saveToCatalog,
               }
             : item,
         ),
@@ -368,7 +366,6 @@ export default function NewDocumentPage() {
           quantity,
           unitPrice,
           igvRate,
-          saveToCatalog: itemDraft.saveToCatalog,
         },
       ])
     }
@@ -389,7 +386,6 @@ export default function NewDocumentPage() {
         quantity: 1,
         unitPrice: catalogItem.salePrice,
         igvRate: DEFAULT_IGV_RATE,
-        saveToCatalog: true,
       },
     ])
     setCatalogQuery('')
@@ -1168,22 +1164,28 @@ export default function NewDocumentPage() {
                 </Field>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={itemDraft.saveToCatalog}
-                    onChange={(event) => setItemDraft((current) => ({ ...current, saveToCatalog: event.target.checked }))}
-                    className="mt-1 size-4 rounded border-slate-300 text-blue-600"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">Guardar en el catálogo</p>
-                    <p className="mt-1 text-sm leading-5 text-slate-500">
-                      Si lo desmarcas, este {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'} se usará únicamente en este comprobante.
-                    </p>
-                  </div>
-                </label>
-              </div>
+              {editingItemId === null ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={itemDraft.saveToCatalog}
+                      onChange={(event) => setItemDraft((current) => ({ ...current, saveToCatalog: event.target.checked }))}
+                      className="mt-1 size-4 rounded border-slate-300 text-blue-600"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Guardar en el catálogo</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-500">
+                        Si lo desmarcas, este {itemDraft.type === 'PRODUCTO' ? 'producto' : 'servicio'} se usará únicamente en este comprobante.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Los cambios se aplican únicamente a este comprobante. Para modificar el catálogo, ingresa a Catálogo.
+                </p>
+              )}
 
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-blue-900">
