@@ -8,6 +8,7 @@ import DraftEditorPage from './pages/DraftEditorPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import NewDocumentPage from './pages/NewDocumentPage'
+import SunatConfigPage from './pages/SunatConfigPage'
 import { supabase } from './utils/supabase'
 
 export default function App() {
@@ -61,6 +62,10 @@ export default function App() {
       />
       <Route path="/borradores" element={session ? <DraftsPage /> : <Navigate to="/login" replace />} />
       <Route path="/borradores/:draftId" element={session ? <DraftEditorPage /> : <Navigate to="/login" replace />} />
+      <Route
+        path="/configuracion/sunat"
+        element={session ? <SunatConfigPage /> : <Navigate to="/login" replace />}
+      />
       <Route
         path="/comprobantes/nuevo"
         element={session ? <NewDocumentPage /> : <Navigate to="/login" replace />}
