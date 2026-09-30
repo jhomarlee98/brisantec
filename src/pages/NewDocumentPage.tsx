@@ -180,6 +180,7 @@ export default function NewDocumentPage() {
   })
 
   function openQuickClient() {
+    setClientError('')
     const inferredType: ClientDocumentType = documentType === '01' ? 'RUC' : 'DNI'
     setClientDraft({
       documentType: inferredType,
@@ -193,6 +194,11 @@ export default function NewDocumentPage() {
   }
 
   function selectClient(client: Client) {
+    if (documentType === '01' && client.documentType !== 'RUC') {
+      setClientError('Estás generando una factura: usa un cliente con RUC.')
+      return
+    }
+    setClientError('')
     setSelectedClientId(client.id)
     setClientQuery(client.documentNumber)
     setSelectedAddress(client.addresses[0] ?? '')
@@ -222,6 +228,10 @@ export default function NewDocumentPage() {
   }
 
   async function saveQuickClient() {
+    if (documentType === '01' && clientDraft.documentType !== 'RUC') {
+      setClientError('Estás generando una factura: usa RUC y razón social.')
+      return
+    }
     const expectedLength = clientDraft.documentType === 'RUC' ? 11 : 8
     const documentNumber = clientDraft.documentNumber.trim()
     const name = clientDraft.name.trim()
@@ -399,6 +409,10 @@ export default function NewDocumentPage() {
   }
 
   async function persistDraft() {
+    if (documentType === '01' && selectedClient && selectedClient.documentType !== 'RUC') {
+      setClientError('Estás generando una factura: usa un cliente con RUC.')
+      return
+    }
     if (saveLock.current) return
     saveLock.current = true
     setDraftSaving(true)
@@ -432,9 +446,12 @@ export default function NewDocumentPage() {
     setCurrency(data.currency)
     setPaymentCondition(data.paymentCondition)
     setIssueDate(data.issueDate)
-    setSelectedClientId(data.clientId)
-    setClientQuery(clients.find((client) => client.id === data.clientId)?.documentNumber ?? '')
-    setSelectedAddress(data.address)
+    const restoredClient = clients.find((client) => client.id === data.clientId)
+    const incompatibleClient = data.documentType === '01' && restoredClient?.documentType === 'DNI'
+    setSelectedClientId(incompatibleClient ? null : data.clientId)
+    setClientQuery(incompatibleClient ? '' : restoredClient?.documentNumber ?? '')
+    setSelectedAddress(incompatibleClient ? '' : data.address)
+    setClientError(incompatibleClient ? 'Este borrador de factura tenía un cliente con DNI. Selecciona un cliente con RUC.' : '')
     setPurchaseOrder(data.purchaseOrder)
     setExchangeRate(data.exchangeRate)
     setItems(data.items)
@@ -507,7 +524,17 @@ export default function NewDocumentPage() {
                 <Field label="Tipo de comprobante">
                   <select
                     value={documentType}
-                    onChange={(event) => setDocumentType(event.target.value as DocumentType)}
+                    onChange={(event) => {
+                      const nextType = event.target.value as DocumentType
+                      setDocumentType(nextType)
+                      setClientError('')
+                      if (nextType === '01' && selectedClient?.documentType === 'DNI') {
+                        setSelectedClientId(null)
+                        setSelectedAddress('')
+                        setClientQuery('')
+                        setClientError('Estás generando una factura: selecciona un cliente con RUC.')
+                      }
+                    }}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   >
                     <option value="01">Factura electrónica</option>
@@ -554,7 +581,7 @@ export default function NewDocumentPage() {
                       setSelectedClientId(null)
                       setSelectedAddress('')
                     }}
-                    placeholder="Buscar por RUC, DNI o nombre..."
+                    placeholder={documentType === '01' ? 'Buscar por RUC o razón social...' : 'Buscar por RUC, DNI o nombre...'}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   />
                 </div>
@@ -889,10 +916,18 @@ export default function NewDocumentPage() {
             </div>
 
             <div className="space-y-5 px-5 py-5 sm:px-6">
+              {documentType === '01' && (
+                <p role="status" className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
+                  Estás generando una factura: usa RUC y razón social. El tipo de documento está fijado en RUC.
+                </p>
+              )}
+              {clientError && <p role="alert" className="text-sm text-red-700">{clientError}</p>}
+
               <div className="grid gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
                 <Field label="Tipo de documento">
                   <select
                     value={clientDraft.documentType}
+                    disabled={documentType === '01'}
                     onChange={(event) =>
                       setClientDraft((current) => ({
                         ...current,
@@ -903,7 +938,7 @@ export default function NewDocumentPage() {
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                   >
                     <option value="RUC">RUC</option>
-                    <option value="DNI">DNI</option>
+                    {documentType !== '01' && <option value="DNI">DNI</option>}
                   </select>
                 </Field>
 
