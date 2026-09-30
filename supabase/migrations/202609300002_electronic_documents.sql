@@ -89,7 +89,7 @@ end;
 $$;
 
 revoke all on function public.reserve_document_number(uuid, varchar, varchar) from public;
-grant execute on function public.reserve_document_number(uuid, varchar, varchar) to authenticated;
+grant execute on function public.reserve_document_number(uuid, varchar, varchar) to service_role;
 
 comment on function public.reserve_document_number(uuid, varchar, varchar) is
 'Incrementa y devuelve el siguiente correlativo de forma atómica. La emisión final debe invocarlo desde el flujo backend.';
