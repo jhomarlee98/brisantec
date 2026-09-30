@@ -61,7 +61,7 @@ export default function DashboardPage() {
         <aside className="hidden min-h-[calc(100dvh-4rem)] border-r border-slate-200 bg-white p-4 lg:flex lg:flex-col">
           <nav className="space-y-1">
             <NavItem icon={Home} label="Inicio" active />
-            <NavItem icon={FileText} label="Comprobantes" />
+            <NavItem icon={FileText} label="Borradores" onClick={() => navigate('/borradores')} />
             <NavItem icon={Users} label="Clientes" onClick={() => navigate("/clientes")} />
             <NavItem icon={Package} label="Productos y servicios" onClick={() => navigate("/catalogo")} />
             <NavItem icon={HandCoins} label="Pagos" />
@@ -97,6 +97,10 @@ export default function DashboardPage() {
               Nuevo comprobante
             </button>
           </div>
+
+          <button onClick={() => navigate('/borradores')} className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            <FileText className="size-4" /> Mis borradores
+          </button>
 
           <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {metrics.map((metric) => (

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import CatalogPage from './pages/CatalogPage'
 import ClientsPage from './pages/ClientsPage'
+import DraftsPage from './pages/DraftsPage'
+import DraftEditorPage from './pages/DraftEditorPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import NewDocumentPage from './pages/NewDocumentPage'
@@ -57,6 +59,8 @@ export default function App() {
         path="/catalogo"
         element={session ? <CatalogPage /> : <Navigate to="/login" replace />}
       />
+      <Route path="/borradores" element={session ? <DraftsPage /> : <Navigate to="/login" replace />} />
+      <Route path="/borradores/:draftId" element={session ? <DraftEditorPage /> : <Navigate to="/login" replace />} />
       <Route
         path="/comprobantes/nuevo"
         element={session ? <NewDocumentPage /> : <Navigate to="/login" replace />}

@@ -40,3 +40,17 @@ export async function saveDraft(id: string, contenido: DraftContent): Promise<Dr
   if (error) throw error
   return data as Draft
 }
+
+export async function getDraft(id: string): Promise<Draft | null> {
+  const { data, error } = await supabase.from('comprobante_borradores')
+    .select('id, contenido, updated_at').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data as Draft | null
+}
+
+export async function deleteDraft(id: string): Promise<void> {
+  const { data, error } = await supabase.from('comprobante_borradores')
+    .delete().eq('id', id).select('id')
+  if (error) throw error
+  if (data.length !== 1) throw new Error('No se encontró el borrador o no tienes permiso para eliminarlo.')
+}

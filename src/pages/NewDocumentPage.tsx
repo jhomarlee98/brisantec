@@ -22,6 +22,8 @@ import { listCatalogItems, saveCatalogItem, type CatalogItem } from '../utils/ca
 
 import { listDrafts, saveDraft, type Draft, type DraftContent } from '../utils/borradores'
 
+import { draftSnapshot } from '../utils/draftSnapshot'
+
 import { reviewInstallments, type Installment } from '../utils/cuotas'
 
 type DocumentType = '01' | '03'
@@ -40,21 +42,25 @@ type Item = {
   igvRate: number
 }
 
-export default function NewDocumentPage() {
+export default function NewDocumentPage({ initialDraft, initialClients = [] }: { initialDraft?: Draft; initialClients?: Client[] }) {
+  const initial = initialDraft?.contenido
+  const initialClient = initialClients.find((client) => client.id === initial?.clientId)
+  const incompatibleInitialClient = initial?.documentType === '01' && initialClient?.documentType === 'DNI'
+
   const navigate = useNavigate()
-  const [draftId, setDraftId] = useState<string>(() => crypto.randomUUID())
-  const [issueDate, setIssueDate] = useState(() => new Intl.DateTimeFormat('en-CA', {
+  const [draftId, setDraftId] = useState<string>(() => initialDraft?.id ?? crypto.randomUUID())
+  const [issueDate, setIssueDate] = useState(() => initial?.issueDate ?? new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date()))
-  const [purchaseOrder, setPurchaseOrder] = useState('')
-  const [exchangeRate, setExchangeRate] = useState('')
+  const [purchaseOrder, setPurchaseOrder] = useState(initial?.purchaseOrder ?? '')
+  const [exchangeRate, setExchangeRate] = useState(initial?.exchangeRate ?? '')
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [draftSaving, setDraftSaving] = useState(false)
   const [draftLoading, setDraftLoading] = useState(true)
   const [draftError, setDraftError] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
   const saveLock = useRef(false)
-  const [savedContent, setSavedContent] = useState('')
+  const [savedContent, setSavedContent] = useState(() => initial ? draftSnapshot({ ...initial, installments: initial.installments ?? [] }) : '')
 
   useEffect(() => {
     let active = true
@@ -64,24 +70,24 @@ export default function NewDocumentPage() {
     return () => { active = false }
   }, [])
 
-  const [documentType, setDocumentType] = useState<DocumentType>('01')
-  const [currency, setCurrency] = useState<Currency>('PEN')
-  const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>('CONTADO')
-  const [installments, setInstallments] = useState<Installment[]>([])
-  const [items, setItems] = useState<Item[]>([])
+  const [documentType, setDocumentType] = useState<DocumentType>(initial?.documentType ?? '01')
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'PEN')
+  const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>(initial?.paymentCondition ?? 'CONTADO')
+  const [installments, setInstallments] = useState<Installment[]>(initial?.installments ?? [])
+  const [items, setItems] = useState<Item[]>(initial?.items ?? [])
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
   const [catalogQuery, setCatalogQuery] = useState('')
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogSaving, setCatalogSaving] = useState(false)
   const [catalogError, setCatalogError] = useState('')
-  const [clients, setClients] = useState<Client[]>([])
-  const [clientQuery, setClientQuery] = useState('')
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
-  const [selectedAddress, setSelectedAddress] = useState('')
+  const [clients, setClients] = useState<Client[]>(initialClients)
+  const [clientQuery, setClientQuery] = useState(incompatibleInitialClient ? '' : initialClient?.documentNumber ?? '')
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(incompatibleInitialClient ? null : initial?.clientId ?? null)
+  const [selectedAddress, setSelectedAddress] = useState(incompatibleInitialClient ? '' : initial?.address ?? '')
   const [clientFormOpen, setClientFormOpen] = useState(false)
-  const [clientsLoading, setClientsLoading] = useState(true)
+  const [clientsLoading, setClientsLoading] = useState(!initialDraft)
   const [clientSaving, setClientSaving] = useState(false)
-  const [clientError, setClientError] = useState('')
+  const [clientError, setClientError] = useState(incompatibleInitialClient ? 'Este borrador de factura tenía un cliente con DNI. Selecciona un cliente con RUC.' : '')
   const [clientDraft, setClientDraft] = useState({
     documentType: 'RUC' as ClientDocumentType,
     documentNumber: '',
@@ -106,6 +112,8 @@ export default function NewDocumentPage() {
   useEffect(() => {
     let active = true
 
+    if (initialDraft) return () => { active = false }
+
     listClients()
       .then((data) => {
         if (active) setClients(data)
@@ -121,7 +129,7 @@ export default function NewDocumentPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [initialDraft])
 
   useEffect(() => {
     let active = true
@@ -427,7 +435,7 @@ export default function NewDocumentPage() {
     const content = currentContent()
     try {
       const saved = await saveDraft(draftId, content)
-      setSavedContent(JSON.stringify(content))
+      setSavedContent(draftSnapshot(content))
       setDrafts((current) => [saved, ...current.filter((draft) => draft.id !== saved.id)])
       setDraftMessage(content.paymentCondition === 'CREDITO' && installmentReview.errors.length > 0
         ? 'Borrador guardado. El cronograma de cuotas está incompleto; podrás terminarlo después.'
@@ -441,7 +449,7 @@ export default function NewDocumentPage() {
   }
 
   function restoreDraft(draft: Draft) {
-    if (savedContent !== JSON.stringify(currentContent()) &&
+    if (savedContent !== draftSnapshot(currentContent()) &&
         (items.length > 0 || selectedClientId || purchaseOrder || exchangeRate || paymentCondition === 'CREDITO') &&
         !window.confirm('Hay cambios sin guardar. ¿Deseas reemplazarlos con este borrador?')) return
     const data = draft.contenido
@@ -464,12 +472,12 @@ export default function NewDocumentPage() {
     setPurchaseOrder(data.purchaseOrder)
     setExchangeRate(data.exchangeRate)
     setItems(data.items)
-    setSavedContent(JSON.stringify({ ...data, installments: data.installments ?? [] }))
+    setSavedContent(draftSnapshot({ ...data, installments: data.installments ?? [] }))
     setDraftMessage('Borrador recuperado. Puedes editarlo y guardar los cambios.')
     setDraftError('')
   }
 
-  const serializedContent = JSON.stringify(currentContent())
+  const serializedContent = draftSnapshot(currentContent())
   const hasUnsavedChanges = serializedContent !== savedContent &&
     (items.length > 0 || Boolean(selectedClientId || purchaseOrder || exchangeRate) || paymentCondition === 'CREDITO' || Boolean(savedContent))
   useEffect(() => {
@@ -492,14 +500,14 @@ export default function NewDocumentPage() {
         <div className="mx-auto flex h-16 max-w-[1536px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { if (!hasUnsavedChanges || window.confirm('Hay cambios sin guardar. ¿Deseas salir?')) navigate('/dashboard') }}
+              onClick={() => { if (!hasUnsavedChanges || window.confirm('Hay cambios sin guardar. ¿Deseas salir?')) navigate(initialDraft ? '/borradores' : '/dashboard') }}
               className="grid size-10 place-items-center rounded-xl text-slate-600 transition hover:bg-slate-100"
               aria-label="Volver"
             >
               <ArrowLeft className="size-5" />
             </button>
             <div>
-              <p className="font-semibold leading-none text-slate-950">Nuevo comprobante</p>
+              <p className="font-semibold leading-none text-slate-950">{initialDraft ? 'Editar borrador' : 'Nuevo comprobante'}</p>
               <p className="mt-1 hidden text-xs text-slate-500 sm:block">BRISANTEC · Facturación electrónica</p>
             </div>
           </div>
@@ -513,6 +521,7 @@ export default function NewDocumentPage() {
 
       <main className="mx-auto w-full max-w-[1536px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
         <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4" aria-label="Borradores guardados">
+          {!initialDraft && <>
           <label htmlFor="draft-selector" className="text-sm font-semibold text-slate-800">Recuperar borrador</label>
           <select id="draft-selector" value="" disabled={draftSaving || draftLoading || clientsLoading}
             onChange={(event) => { const draft = drafts.find((entry) => entry.id === event.target.value); if (draft) restoreDraft(draft) }}
@@ -522,6 +531,7 @@ export default function NewDocumentPage() {
               {draft.contenido.documentType === '01' ? 'Factura' : 'Boleta'} · {draft.contenido.issueDate} · {clients.find((client) => client.id === draft.contenido.clientId)?.name ?? 'Sin cliente'} · {draft.id.slice(0, 8)}
             </option>)}
           </select>
+          </>}
           {hasUnsavedChanges && <p className="mt-3 text-sm text-amber-700">Hay cambios sin guardar.</p>}
           {draftMessage && !hasUnsavedChanges && <p role="status" className="mt-3 text-sm text-green-700">{draftMessage}</p>}
           {draftError && <p role="alert" className="mt-3 text-sm text-red-700">{draftError}</p>}

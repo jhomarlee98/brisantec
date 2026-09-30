@@ -38,3 +38,20 @@ No requiere migración adicional: se guarda `installments` dentro del JSON exist
 Pruebas automáticas (Node 24): `node --test tests/cuotas.test.mjs`.
 
 Prueba manual pendiente en Supabase: crear una venta de 118.00 a crédito, distribuir 59.00 y 59.00 con vencimientos válidos, guardar, recargar y recuperar. Deben conservarse ambas cuotas. Cambiar una a 60.00 debe mostrar exceso de 1.00; dejar una fecha vacía debe advertir y permitir guardar como borrador incompleto. Probar cambiar a contado cancelando y aceptando la confirmación.
+
+## Pantalla Mis borradores
+
+Desde el panel (también en móvil), abrir **Mis borradores**. Permite buscar por cliente, documento, fecha ISO, orden de compra o ID, filtrar facturas/boletas, consultar total y última modificación, continuar edición y eliminar con confirmación. Los borradores se siguen restringiendo a su propietario mediante RLS.
+
+Aplicar una sola vez `supabase/migrations/202609300002_borradores_delete.sql` en SQL Editor, después de la primera migración. Solo añade el permiso y la política DELETE para el propietario. No elimina registros al ejecutarse. Sin esta migración, listado y edición funcionan, pero eliminar no está habilitado en la base.
+
+Pruebas manuales pendientes en Supabase:
+
+1. Guardar dos borradores con distintos clientes, monedas y condiciones. Buscar por nombre/documento y filtrar por tipo.
+2. Abrir uno desde la lista y verificar cliente, dirección, ítems, moneda, fecha y cuotas. Recargar la URL: debe conservar el borrador seleccionado.
+3. Editar y guardar. Volver a la lista: debe mostrar el nuevo importe sin duplicar la fila.
+4. Cancelar la confirmación de eliminar: debe conservar el borrador. Aceptarla: debe desaparecer y seguir ausente al recargar.
+5. Con otra cuenta, comprobar que no se lista el borrador ajeno, no se abre mediante su URL y no puede eliminarse mediante la API.
+6. Un ID inexistente o enlace inválido debe mostrar un mensaje y permitir volver al listado.
+
+El listado no representa comprobantes emitidos ni ventas cobradas. Ejecutar `node --test tests/*.test.mjs` para las pruebas de cuotas y comparación de JSONB. La compilación y estas pruebas no verifican la conexión real ni las políticas remotas.
