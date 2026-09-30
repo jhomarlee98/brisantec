@@ -5,6 +5,7 @@ import {
   CircleDollarSign,
   ClipboardList,
   FileText,
+  Eye,
   Package,
   Pencil,
   Plus,
@@ -21,6 +22,8 @@ import { createClient, listClients, type Client, type ClientDocumentType } from 
 import { listCatalogItems, saveCatalogItem, type CatalogItem } from '../utils/catalogo'
 
 import { listDrafts, saveDraft, type Draft, type DraftContent } from '../utils/borradores'
+
+import DocumentPreview from '../components/DocumentPreview'
 
 import { draftSnapshot } from '../utils/draftSnapshot'
 
@@ -48,6 +51,7 @@ export default function NewDocumentPage({ initialDraft, initialClients = [] }: {
   const incompatibleInitialClient = initial?.documentType === '01' && initialClient?.documentType === 'DNI'
 
   const navigate = useNavigate()
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [draftId, setDraftId] = useState<string>(() => initialDraft?.id ?? crypto.randomUUID())
   const [issueDate, setIssueDate] = useState(() => initial?.issueDate ?? new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -944,6 +948,10 @@ export default function NewDocumentPage({ initialDraft, initialClients = [] }: {
                 </div>
               )}
 
+              <button type="button" onClick={() => setPreviewOpen(true)} className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+                <Eye className="size-4" /> Vista previa / PDF
+              </button>
+
               <button disabled title="La emisión electrónica aún no está disponible" className="disabled:cursor-not-allowed disabled:opacity-50 mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
                 Emisión electrónica pendiente
               </button>
@@ -956,6 +964,8 @@ export default function NewDocumentPage({ initialDraft, initialClients = [] }: {
           </aside>
         </div>
       </main>
+
+      {previewOpen && <DocumentPreview draft={currentContent()} client={selectedClient} totals={totals} onClose={() => setPreviewOpen(false)} />}
 
       {clientFormOpen && (
         <div

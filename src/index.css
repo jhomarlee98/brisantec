@@ -45,3 +45,69 @@ button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
+
+.document-preview {
+  width: min(960px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: #101828;
+  overflow: auto;
+}
+.document-preview::backdrop { background: rgb(15 23 42 / 55%); }
+.preview-toolbar { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; background: white; border-bottom: 1px solid #e2e8f0; z-index: 1; }
+.preview-paper { padding: 32px; font-size: 13px; line-height: 1.5; }
+.preview-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.preview-brand { font-size: 25px; font-weight: 750; letter-spacing: -.04em; }
+.preview-muted { color: #64748b; font-size: 11px; }
+.preview-document-type { text-align: right; }
+.preview-document-type h1 { font-size: 22px; font-weight: 700; }
+.preview-document-type > p:not(.preview-muted) { font-size: 12px; font-weight: 700; }
+.preview-disclaimer { margin: 22px 0; padding: 10px; border: 2px solid #b45309; color: #92400e; text-align: center; font-size: 12px; font-weight: 750; }
+.preview-customer { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin-bottom: 24px; }
+.preview-customer span { color: #64748b; font-size: 11px; }
+.preview-customer p { overflow-wrap: anywhere; }
+.preview-wide { grid-column: 1 / -1; }
+.preview-table-wrap { overflow-x: auto; }
+.preview-items { width: 100%; border-collapse: collapse; font-size: 12px; }
+.preview-items caption { margin-bottom: 8px; text-align: left; color: #64748b; font-size: 11px; }
+.preview-items th { text-align: left; background: #f1f5f9; font-weight: 650; }
+.preview-items th, .preview-items td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.preview-items td:first-child { overflow-wrap: anywhere; min-width: 140px; }
+.preview-items td:nth-last-child(-n+2), .preview-items th:nth-last-child(-n+2) { text-align: right; white-space: nowrap; }
+.preview-items small { color: #64748b; }
+.preview-totals { width: min(100%, 300px); margin: 22px 0 22px auto; }
+.preview-totals > div { display: flex; justify-content: space-between; gap: 24px; padding: 5px 0; }
+.preview-grand-total { border-top: 1px solid #94a3b8; margin-top: 5px; font-size: 18px; font-weight: 700; }
+.preview-credit h2, .preview-pending h2 { font-weight: 650; margin-bottom: 8px; }
+.preview-credit { margin-top: 24px; }
+.preview-pending { margin-top: 24px; padding: 12px; border: 1px solid #f59e0b; font-size: 12px; }
+.preview-pending ul { list-style: disc; padding-left: 18px; }
+.preview-footer { margin-top: 28px; border-top: 1px solid #cbd5e1; padding-top: 12px; font-size: 10px; color: #475569; }
+@media (max-width: 600px) {
+  .preview-paper { padding: 18px; }
+  .preview-toolbar { flex-wrap: wrap; padding: 12px; }
+  .preview-header { flex-direction: column; gap: 12px; }
+  .preview-document-type { text-align: left; }
+}
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body.document-preview-open { overflow: visible !important; background: white; }
+  body.document-preview-open > :not(.document-preview) { display: none !important; }
+  .document-preview[open] { position: static !important; display: block; width: 100%; max-width: none; height: auto; max-height: none; margin: 0; padding: 0; border-radius: 0; overflow: visible; }
+  .document-preview::backdrop { display: none; }
+  .preview-toolbar { display: none; }
+  .preview-paper { padding: 0; font-size: 11px; }
+  .preview-header { flex-direction: row; }
+  .preview-document-type { text-align: right; }
+  .preview-table-wrap { overflow: visible; }
+  .preview-items { font-size: 10px; }
+  .preview-items thead { display: table-header-group; }
+  .preview-items tr, .preview-totals, .preview-disclaimer { break-inside: avoid; }
+  .preview-items td:first-child { min-width: 0; }
+  .preview-items th, .preview-items td { padding: 7px 5px; }
+  .preview-items small, .preview-muted, .preview-customer span, .preview-footer { color: #475569; }
+}

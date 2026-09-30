@@ -55,3 +55,13 @@ Pruebas manuales pendientes en Supabase:
 6. Un ID inexistente o enlace inválido debe mostrar un mensaje y permitir volver al listado.
 
 El listado no representa comprobantes emitidos ni ventas cobradas. Ejecutar `node --test tests/*.test.mjs` para las pruebas de cuotas y comparación de JSONB. La compilación y estas pruebas no verifican la conexión real ni las políticas remotas.
+
+## Vista previa e impresión
+
+En Nuevo comprobante o Editar borrador, usar **Vista previa / PDF**. Muestra el estado actual del formulario: cliente, dirección, fecha, moneda, orden de compra, productos/servicios, importes y cuotas. Usa los mismos totales que el resumen de edición. Se presenta como borrador sin emisión ni numeración fiscal.
+
+**Imprimir / PDF** abre el diálogo del navegador; elegir Guardar como PDF para exportar. Esto no guarda el borrador en Supabase, no registra cobros y no envía a SUNAT. Los datos incompletos quedan indicados en la vista previa. No incluye RUC del emisor, dirección fiscal, firma ni QR de emisión: esos datos aún no están configurados.
+
+El diseño usa CSS de impresión A4, excluye los controles del formulario y permite repetir encabezados de tabla en varias páginas. Referencias: https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Media_queries/Printing y https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/showModal.
+
+Verificación pendiente en navegador real: abrir y cerrar con Escape, imprimir 3 y 65 ítems y comprobar el último ítem/totales/cuotas; revisar en móvil, probar PEN y USD, y confirmar que no aparecen controles en el PDF. La prueba visual automatizada no pudo ejecutarse en este entorno: no había Chromium y su descarga falló. Build/lint y pruebas unitarias no sustituyen esa revisión de impresión.
