@@ -65,7 +65,7 @@ export default function DashboardPage() {
             <NavItem icon={Users} label="Clientes" onClick={() => navigate("/clientes")} />
             <NavItem icon={Package} label="Productos y servicios" onClick={() => navigate("/catalogo")} />
             <NavItem icon={HandCoins} label="Pagos" />
-            <NavItem icon={Settings} label="Configuración" />
+            <NavItem icon={Settings} label="Configuración SUNAT" onClick={() => navigate('/configuracion/sunat')} />
           </nav>
 
           <button
